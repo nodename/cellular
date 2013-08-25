@@ -1,6 +1,6 @@
 (ns utils.helpers
   (:require [clojure.core.async :refer [<! chan]]
-            [clojure.pprint :refer [pprint]])
+            [fipp.edn :refer [pprint]])
   (:require-macros [cljs.core.async.macros :refer [go alt!]]))
 
 (defn pprinter []

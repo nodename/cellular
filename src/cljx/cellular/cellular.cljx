@@ -1,7 +1,8 @@
 (ns cellular.cellular
-  (:require [cljs.core.async :refer [>! <! chan]])
-  (:require-macros [cljs.core.async.macros :refer [go alt!]]
-                   [cellular.macros :refer [copy get-row]]))
+#+clj (:require [clojure.core.async :refer [<! >! chan go]])
+#+cljs  (:require [cljs.core.async :refer [>! <! chan]])
+#+cljs  (:require-macros [cljs.core.async.macros :refer [go alt!]])
+  )
 
 (defn initializer
   [n initial-values]
@@ -147,8 +148,13 @@
 (defn outputter
   [q m]
   (fn [qi qj in out]
-    (let [subgrid-in (chan)]
-      (go (while true
+    (let [subgrid-in (chan)
+          copy (fn [count in out]
+                 (go
+                   (dotimes [_ count]
+                     (>! out (<! in)))))]
+      (go
+        (while true
             (let [subgrid (<! subgrid-in)]
               (dotimes [i m]
                 (let [ii (inc i)]
@@ -180,15 +186,24 @@ The single input channel comes from the output function of channel h0q (the last
 the north boundary row, i.e. the channel that receives the output from the pipeline threaded
 through the interior elements only."
   [n in start-time]
-  (let [out (chan)]
+  (let [out (chan)
+        get-row (fn [n in]
+                  (let [out (chan)]
+                    (go
+                      (loop [j 0
+                             row []]
+                        (if (= j n)
+                          (>! out row)
+                          (recur (inc j) (conj row (<! in))))))
+                    out))]
     (go
       (while true
         (let [grid (loop [grid []]
                      (if (= (count grid) n)
                        grid
-                       (recur (conj grid (get-row n in)))))
-              elapsed-ms (long (/ (- (System/nanoTime) start-time) 1000000))]
-          (>! out [elapsed-ms grid]))))
+                       (recur (conj grid (<! (get-row n in))))))
+              elapsed-ms #+clj (long (/ (- (System/nanoTime) start-time) 1000000)) #+cljs (- (.getTime (js/Date.)) start-time)]
+          (>! out {:elapsed-ms elapsed-ms :grid grid}))))
     out))
 
 (defn simulate
@@ -224,7 +239,7 @@ The application object must specify:
         relax (relaxation q m transition)
         output (outputter q m)
         init-node (node init relax steps output)
-        start-time (System/nanoTime)
+        start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
         out (master n ((output-channels 0) q) start-time)]
     
     ;; node coordinates range from 1 to q inclusive

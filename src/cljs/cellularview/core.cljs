@@ -1,4 +1,7 @@
-(ns cellularview.core)
+(ns cellularview.core
+  (:require [cljs.core.async :refer [<!]]
+            [cellular.forestfire :refer [simulate-forestfire]])
+  (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (defn log [& more]
   (.log js/console (apply str more)))
@@ -13,46 +16,44 @@
   []
   (js/alert "Hello, world!"))
 
+(defn color
+  [state]
+  (condp = state
+    :alive {:r 0 :g 255 :b 0}
+    :burning {:r 255 :g 0 :b 0}
+    :dead {:r 139 :g 69 :b 19}))
+
 (defn fill-rect
   [ctx x y width height r g b]
   (set! (.-fillStyle ctx) (str "rgb(" r "," g "," b ")"))
   (.fillRect ctx x y width height))
 
 (defn render
-  [canvas]
+  [canvas cells]
   (let [ctx (.getContext canvas "2d")]
     (.clearRect ctx 0 0 (.-width canvas) (.-height canvas))
-    (let [image-data (.createImageData ctx 500 500)
-          num-tile-rows 4
-          num-tile-cols 4
+    (let [image-data (.createImageData ctx 800 800)
+          num-tile-rows (count cells)
+          num-tile-cols (count cells) ;; we assume cells is square
           tile-width (/ (.-width image-data) num-tile-cols)
           tile-height (/ (.-height image-data) num-tile-rows)]
       (doseq [j (range num-tile-rows)
               i (range num-tile-cols)]
-        (let [r (int (* (Math/random) 255))
-              g (int (* (Math/random) 255))
-              b (int (* (Math/random) 255))]
+        (let [cell ((cells i) j)
+              {:keys [r g b]} (color cell)]
           (fill-rect ctx (* i tile-width) (* j tile-height) tile-width tile-height r g b))))))
-            
-          
-        
-    
-  
-
 
 (defn init
-  "Given an atom containing a seq of boids, initialize the view"
-  [
- ;  cells-atom
-   ]
+  "Given an atom, initialize the view"
+  [cells-atom]
   (let [canvas (.createElement js/document "canvas")]
     (.setAttribute canvas "width" (.-innerWidth js/window))
     (.setAttribute canvas "height" (.-innerHeight js/window))
     (.appendChild (.-body js/document) canvas)
- ;   (add-watch cells-atom :renderer (fn [_ _ _ flock]
- ;                                     (render canvas flock)))))
- (render canvas)
- ))
+  ;  (add-watch cells-atom :renderer (fn [_ _ _ cells] (render canvas cells)))
+    
+  canvas
+    ))
 
 (defn requestAnimationFrame
   "Cross-browser wrapper for requestAnimationFrame"
@@ -67,21 +68,34 @@
    (.-msRequestAnimationFrame js/window)
    (.msRequestAnimationFrame js/window callback)))
 
-(comment
-(defn tick
-  "The main 'loop' of the simulation."
-  [options-atom cells-atom]
-  (swap! cells-atom (partial update-flock @options-atom))
-  (requestAnimationFrame #(tick options-atom cells-atom))))
+;(comment
+;(defn run
+;  "The main 'loop' of the simulation."
+;  [q m steps cells-atom]
+;  (let [simulation (simulate-forestfire q m steps)
+;        tick (fn tick [cells-atom]
+;               (let [grid ((<!! simulation) :grid)]
+;                 (log grid)
+;               (reset! cells-atom grid)
+;               (requestAnimationFrame #(tick cells-atom))))]
+;    nil)))
 
 (defn main
   []
-  (init))
+  (let [canvas (init nil)
+        cells [[:alive :alive :alive] [:alive :alive :alive] [:alive :alive :dead]]
+        simulation (simulate-forestfire 10 6 5)]
+    (go
+      (let [grid ((<! simulation) :grid)
+            grid ((<! simulation) :grid)
+            grid ((<! simulation) :grid)]
+        (render canvas grid)))))
+  
 
-(comment
-(defn main
-  "Starts everything"
-  []
-  (let [cells-atom (atom (repeatedly 15 create-boid))]
-    (init cells-atom)
-    (tick cells-atom))))
+;(comment
+;(defn main
+;  "Starts everything"
+;  []
+;  (let [cells-atom (atom [])]
+;    (init cells-atom)
+;    (run 3 2 10 cells-atom))))

@@ -1,5 +1,5 @@
 (ns cellular.cellular
-#+clj (:require [clojure.core.async :refer [<! >! chan go]])
+#+clj   (:require [clojure.core.async :refer [<! >! chan go]])
 #+cljs  (:require [cljs.core.async :refer [>! <! chan]])
 #+cljs  (:require-macros [cljs.core.async.macros :refer [go alt!]])
   )
@@ -190,11 +190,10 @@ through the interior elements only."
         get-row (fn [n in]
                   (let [out (chan)]
                     (go
-                      (loop [j 0
-                             row []]
-                        (if (= j n)
+                      (loop [row []]
+                        (if (= (count row) n)
                           (>! out row)
-                          (recur (inc j) (conj row (<! in))))))
+                          (recur (conj row (<! in))))))
                     out))]
     (go
       (while true

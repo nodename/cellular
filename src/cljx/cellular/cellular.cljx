@@ -1,8 +1,7 @@
 (ns cellular.cellular
 #+clj   (:require [clojure.core.async :refer [<! >! chan go]])
 #+cljs  (:require [cljs.core.async :refer [>! <! chan]])
-#+cljs  (:require-macros [cljs.core.async.macros :refer [go alt!]])
-  )
+#+cljs  (:require-macros [cljs.core.async.macros :refer [go alt!]]))
 
 (defn initializer
   [n initial-values]
@@ -18,8 +17,9 @@
 (defn newgrid-row
   [m initialize i0 j0 i]
   (let [f (fn [row j]
-            (conj row (initialize (+ i0 i) (+ j0 j))))]
-    (reduce f [] (range (+ 2 m)))))
+            (swap! row conj (initialize (+ i0 i) (+ j0 j)))
+            row)]
+    (reduce f (atom []) (range (+ 2 m)))))
       
 (defn newgrid
   [m initialize]
@@ -27,24 +27,20 @@
     (let [i0 (* (dec qi) m)
           j0 (* (dec qj) m)
           f (fn [grid i]
-              (conj grid (newgrid-row m initialize i0 j0 i)))]
-      (reduce f [] (range (+ 2 m))))))
+              (swap! grid conj @(newgrid-row m initialize i0 j0 i))
+              grid)]
+      (reduce f (atom []) (range (+ 2 m))))))
 
 (defn phase1-step
   [q m qi qj channels u k]
   (let [{:keys [north south east west]} channels
         out (chan)]
     (go
-      (when (< qi q) (>! south ((u m) k)))
-      (when (< qj q) (>! east ((u k) m)))
-      (go
-        (let [u (if (> qi 1)
-                  (assoc-in u [0 k] (<! north))
-                  u)
-              u (if (> qj 1)
-                  (assoc-in u [k 0] (<! west))
-                  u)]
-          (>! out u))))
+      (when (> qi 1) (swap! u assoc-in [0 k] (<! north)))
+      (when (< qi q) (>! south ((@u m) k)))
+      (when (< qj q) (>! east ((@u k) m)))
+      (when (> qj 1) (swap! u assoc-in [k 0] (<! west)))
+      (>! out u))
     out))
 
 (defn exchange-phase1
@@ -67,16 +63,11 @@
   (let [{:keys [north south east west]} channels
         out (chan)]
     (go
-      (when (> qi 1) (>! north ((u 1) k)))
-      (when (> qj 1) (>! west ((u k) 1)))
-      (go
-        (let [u (if (< qi q)
-                  (assoc-in u [(inc m) k] (<! south))
-                  u)
-              u (if (< qj q)
-                  (assoc-in u [k (inc m)] (<! east))
-                  u)]
-          (>! out u))))
+      (when (> qi 1) (>! north ((@u 1) k)))
+      (when (< qi q) (swap! u assoc-in [(inc m) k] (<! south)))
+      (when (< qj q) (swap! u assoc-in [k (inc m)] (<! east)))
+      (when (> qj 1) (>! west ((@u k) 1)))
+      (>! out u))
     out))
 
 (defn exchange-phase2
@@ -105,7 +96,8 @@
   [transition q m qi qj channels]
   (fn [u b]
     (let [assoc-next-state-in (fn [u i j]
-                                (assoc-in u [i j] (transition u i j)))
+                                (swap! u assoc-in [i j] (transition @u i j))
+                                u)
           assoc-row-of-next-states-in (fn [u i]
                                         (let [k (mod (+ i b) 2)
                                               last (- m k)
@@ -155,7 +147,7 @@
                      (>! out (<! in)))))]
       (go
         (while true
-            (let [subgrid (<! subgrid-in)]
+            (let [subgrid @(<! subgrid-in)]
               (dotimes [i m]
                 (let [ii (inc i)]
                   (dotimes [j m]

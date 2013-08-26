@@ -31,15 +31,36 @@
               grid)]
       (reduce f (atom []) (range (+ 2 m))))))
 
+(defn par-do
+  "wait for n channels to say done"
+  [n]
+  (let [done (chan)
+        all-done (chan)]
+    (go
+      (dotimes [_ n]
+        (<! done))
+      (>! all-done :done))
+    [done all-done]))
+
 (defn phase1-step
   [q m qi qj channels u k]
   (let [{:keys [north south east west]} channels
+        [done all-done] (par-do 4)
         out (chan)]
     (go
       (when (> qi 1) (swap! u assoc-in [0 k] (<! north)))
+      (>! done :done))
+    (go
       (when (< qi q) (>! south ((@u m) k)))
+      (>! done :done))
+    (go
       (when (< qj q) (>! east ((@u k) m)))
+      (>! done :done))
+    (go
       (when (> qj 1) (swap! u assoc-in [k 0] (<! west)))
+      (>! done :done))
+    (go
+      (<! all-done)
       (>! out u))
     out))
 
@@ -61,12 +82,22 @@
 (defn phase2-step
   [q m qi qj channels u k]
   (let [{:keys [north south east west]} channels
+        [done all-done] (par-do 4)
         out (chan)]
     (go
       (when (> qi 1) (>! north ((@u 1) k)))
+      (>! done :done))
+    (go
       (when (< qi q) (swap! u assoc-in [(inc m) k] (<! south)))
+      (>! done :done))
+    (go
       (when (< qj q) (swap! u assoc-in [k (inc m)] (<! east)))
+      (>! done :done))
+    (go
       (when (> qj 1) (>! west ((@u k) 1)))
+      (>! done :done))
+    (go
+      (<! all-done)
       (>! out u))
     out))
 

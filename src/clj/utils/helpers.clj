@@ -27,4 +27,5 @@
           (println "")
           (do
             (.print System/out (str value \newline \newline)) ; This is apparently different from (print value), which doesn't flush everything until the user hits return!
-            (println "")))))))
+            (println ""))))))
+  nil)

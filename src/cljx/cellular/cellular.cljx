@@ -117,17 +117,13 @@
 (defn relax-phase
   [transition q m qi qj channels]
   (fn [u b]
-    (let [assoc-next-state-in (fn [u i j]
-                                (swap! u assoc-in [i j] (transition @u i j))
-                                u)
-          assoc-row-of-next-states-in (fn [u i]
-                                        (let [k (mod (+ i b) 2)
-                                              last (- m k)
-                                              f (fn [u j]
-                                                  (assoc-next-state-in u i j))]
-                                          (reduce f u (range (- 2 k) (inc last) 2))))
-          assoc-next-states-in (fn [u]
-                                 (reduce assoc-row-of-next-states-in u (range 1 (inc m))))]
+    (let [assoc-next-states-in (fn [u]
+                                 (doseq [i (range 1 (inc m))]
+                                   (let [k (mod (+ i b) 2)
+                                         last (- m k)]
+                                     (doseq [j (range (- 2 k) (inc last) 2)]
+                                       (swap! u assoc-in [i j] (transition @u i j)))))
+                                 u)]
       
       (let [out (chan)]
         (go

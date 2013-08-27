@@ -55,13 +55,13 @@
     out))
 
 (defn exchange-phase1
-  [q m qi qj b channels u]
+  [q m qi qj parity channels u]
   ;; qi row number, qj column number
   ;; qi, qj go from 1 to q inclusive
   (let [out (chan)
-        last (- m b)]
+        last (- m parity)]
     (go
-      (let [new-u (loop [k (- 2 b)
+      (let [new-u (loop [k (- 2 parity)
                          u u]
                     (if (> k last)
                       u
@@ -93,11 +93,11 @@
     out))
 
 (defn exchange-phase2
-  [q m qi qj b channels u]
+  [q m qi qj parity channels u]
   (let [out (chan)
-        last (dec (+ m b))]
+        last (dec (+ m parity))]
     (go
-      (let [new-u (loop [k (inc b)
+      (let [new-u (loop [k (inc parity)
                          u u]
                     (if (> k last)
                       u
@@ -106,20 +106,20 @@
     out))
 
 (defn exchange
-  [q m qi qj b channels u]
+  [q m qi qj parity channels u]
   (let [out (chan)]
     (go
-      (let [u (<! (exchange-phase1 q m qi qj b channels u))
-            u (<! (exchange-phase2 q m qi qj b channels u))]
+      (let [u (<! (exchange-phase1 q m qi qj parity channels u))
+            u (<! (exchange-phase2 q m qi qj parity channels u))]
         (>! out u)))
     out))
 
 (defn relax-phase
   [transition q m qi qj channels]
-  (fn [u b]
+  (fn [u parity]
     (let [assoc-next-states-in (fn [u]
                                  (doseq [i (range 1 (inc m))]
-                                   (let [k (mod (+ i b) 2)
+                                   (let [k (mod (+ i parity) 2)
                                          last (- m k)]
                                      (doseq [j (range (- 2 k) (inc last) 2)]
                                        (swap! u assoc-in [i j] (transition @u i j)))))
@@ -127,7 +127,7 @@
       
       (let [out (chan)]
         (go
-          (let [u (<! (exchange q m qi qj (- 1 b) channels u))
+          (let [u (<! (exchange q m qi qj (- 1 parity) channels u))
                 u (assoc-next-states-in u)]
             (>! out u)))
         out))))

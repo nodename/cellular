@@ -40,10 +40,10 @@
       (when (> qi 1) (swap! subgrid-atom assoc-in [0 k] (<! north)))
       (>! done :done))
     (go
-      (when (< qi q) (>! south ((@subgrid-atom m) k)))
+      (when (< qi q) (>! south (get-in @subgrid-atom [m k])))
       (>! done :done))
     (go
-      (when (< qj q) (>! east ((@subgrid-atom k) m)))
+      (when (< qj q) (>! east (get-in @subgrid-atom [k m])))
       (>! done :done))
     (go
       (when (> qj 1) (swap! subgrid-atom assoc-in [k 0] (<! west)))
@@ -75,7 +75,7 @@
         done (chan)
         out (chan)]
     (go
-      (when (> qi 1) (>! north ((@subgrid-atom 1) k)))
+      (when (> qi 1) (>! north (get-in @subgrid-atom [1 k])))
       (>! done :done))
     (go
       (when (< qi q) (swap! subgrid-atom assoc-in [(inc m) k] (<! south)))
@@ -84,7 +84,7 @@
       (when (< qj q) (swap! subgrid-atom assoc-in [k (inc m)] (<! east)))
       (>! done :done))
     (go
-      (when (> qj 1) (>! west ((@subgrid-atom k) 1)))
+      (when (> qj 1) (>! west (get-in @subgrid-atom [k 1])))
       (>! done :done))
     (go
       (dotimes [_ 4]
@@ -170,7 +170,7 @@
                 (let [ii (inc i)]
                   (dotimes [j m]
                     (let [jj (inc j)]
-                      (>! out ((subgrid ii) jj))))
+                      (>! out (get-in subgrid [ii jj]))))
                   (copy (* (- q qj) m) in out)))
               (copy (* (- q qi) m m q) in out))))
       subgrid-in)))
@@ -254,23 +254,23 @@ The application object must specify:
     ;; node coordinates range from 1 to q inclusive
     
     (doseq [i (range 1 (inc q))]
-      (let [channels {:north ((ns-channels (dec i)) 1)
-                      :south ((ns-channels i) 1)
-                      :east ((ew-channels i) 1)
-                      :west ((ew-channels (dec i)) q)
-                      :data-in ((output-channels i) 1)
-                      :data-out ((output-channels (dec i)) q)
+      (let [channels {:north (get-in ns-channels [(dec i) 1])
+                      :south (get-in ns-channels [i 1])
+                      :east (get-in ew-channels [i 1])
+                      :west (get-in ew-channels [(dec i) q])
+                      :data-in (get-in output-channels [i 1])
+                      :data-out (get-in output-channels [(dec i) q])
                       }]
         (init-node i 1 channels)))
     
     (doseq [i (range 1 (inc q))
             j (range 2 (inc q))]
-      (let [channels {:north ((ns-channels (dec i)) j)
-                      :south ((ns-channels i) j)
-                      :east ((ew-channels i) j)
-                      :west ((ew-channels i) (dec j))
-                      :data-in ((output-channels i) j)
-                      :data-out ((output-channels i) (dec j))
+      (let [channels {:north (get-in ns-channels [(dec i) j])
+                      :south (get-in ns-channels [i j])
+                      :east (get-in ew-channels [i j])
+                      :west (get-in ew-channels [i (dec j)])
+                      :data-in (get-in output-channels [i j])
+                      :data-out (get-in output-channels [i (dec j)])
                       }]
         (init-node i j channels)))
     

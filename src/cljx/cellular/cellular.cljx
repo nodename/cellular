@@ -165,7 +165,7 @@
                      (>! out (<! in)))))]
       (go
         (while true
-            (let [subgrid @(<! subgrid-in)]
+            (let [subgrid (<! subgrid-in)]
               (dotimes [i m]
                 (let [ii (inc i)]
                   (dotimes [j m]
@@ -186,7 +186,7 @@
       (go
         (loop [step 0
                u (init qi qj)]
-          (>! out u)
+          (>! out @u)
           (when (< step steps)
             (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels u RELAXATION-STEPS-PER-OUTPUT)))))))))
 

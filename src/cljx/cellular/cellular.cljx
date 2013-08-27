@@ -16,21 +16,21 @@
 
 (defn newgrid-row
   [m initialize i0 j0 i]
-  (let [f (fn [row j]
-            (swap! row conj (initialize (+ i0 i) (+ j0 j)))
-            row)]
-    (reduce f (atom []) (range (+ 2 m)))))
+  (let [row (atom [])]
+    (doseq [j (range (+ 2 m))]
+      (swap! row conj (initialize (+ i0 i) (+ j0 j))))
+    row))
       
 (defn newgrid
   [m initialize]
   (fn [qi qj]
     (let [i0 (* (dec qi) m)
           j0 (* (dec qj) m)
-          f (fn [grid i]
-              (swap! grid conj @(newgrid-row m initialize i0 j0 i))
-              grid)]
-      (reduce f (atom []) (range (+ 2 m))))))
-
+          grid (atom [])]
+      (doseq [i (range (+ 2 m))]
+        (swap! grid conj @(newgrid-row m initialize i0 j0 i)))
+      grid)))
+        
 (defn phase1-step
   [q m qi qj channels u k]
   (let [{:keys [north south east west]} channels

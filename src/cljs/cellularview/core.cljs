@@ -6,16 +6,6 @@
 (defn log [& more]
   (.log js/console (apply str more)))
 
-(defn prettify [obj]
-  (js/JSON.stringify obj nil 2))
-
-(defn jsonlog [obj]
-  (log (prettify obj)))
-
-(defn hello-world
-  []
-  (js/alert "Hello, world!"))
-
 (defn color
   [state]
   (condp = state
@@ -32,7 +22,7 @@
   [canvas cells]
   (let [ctx (.getContext canvas "2d")]
     (.clearRect ctx 0 0 (.-width canvas) (.-height canvas))
-    (let [image-data (.createImageData ctx 800 800)
+    (let [image-data (.createImageData ctx 600 600)
           num-tile-rows (count cells)
           num-tile-cols (count cells) ;; we assume cells is square
           tile-width (/ (.-width image-data) num-tile-cols)
@@ -83,13 +73,19 @@
 (defn main
   []
   (let [canvas (init nil)
-        cells [[:alive :alive :alive] [:alive :alive :alive] [:alive :alive :dead]]
-        simulation (simulate-forestfire 10 6 5)]
+        cells (atom [[:alive :alive :alive] [:alive :alive :alive] [:alive :alive :dead]])
+        simulation (simulate-forestfire 10 4 5)]
+    (comment
     (go
-      (let [grid ((<! simulation) :grid)
-            grid ((<! simulation) :grid)
-            grid ((<! simulation) :grid)]
-        (render canvas grid)))))
+      (reset! cells ((<! simulation) :grid))
+      (reset! cells ((<! simulation) :grid))
+      (reset! cells ((<! simulation) :grid))
+      (render canvas @cells)))
+    (go
+      (log ((<! simulation) :elapsed-ms))
+      (log ((<! simulation) :elapsed-ms))
+      (log ((<! simulation) :elapsed-ms))
+      (log ((<! simulation) :elapsed-ms)))))
   
 
 ;(comment

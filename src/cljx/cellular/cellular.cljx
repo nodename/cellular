@@ -150,9 +150,12 @@
   (fn [qi qj in out]
     (let [subgrid-in (chan)
           copy (fn [count in out]
-                 (go
-                   (dotimes [_ count]
-                     (>! out (<! in)))))]
+                 (let [done (chan)]
+                   (go
+                     (dotimes [_ count]
+                       (>! out (<! in)))
+                     (>! done :done))
+                   done))]
       (go
         (while true
             (let [subgrid (<! subgrid-in)]
@@ -161,14 +164,14 @@
                   (dotimes [j m]
                     (let [jj (inc j)]
                       (>! out ((subgrid ii) jj))))
-                  (copy (* (- q qj) m) in out)))
-              (copy (* (- q qi) m m q) in out))))
+                  (<! (copy (* (- q qj) m) in out))))
+              (<! (copy (* (- q qi) m m q) in out)))))
       subgrid-in)))
 
 (def RELAXATION-STEPS-PER-OUTPUT 1)
   
 (defn node
-  [init relax steps output]
+  [init relax output]
   (fn [qi qj channels]
   ;; qi row number; qj column number
     (let [{:keys [data-in data-out]} channels

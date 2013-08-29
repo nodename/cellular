@@ -1,8 +1,7 @@
 (ns cellular.cellular
 #+clj   (:require [clojure.core.async :refer [<! >! chan go]])
 #+cljs  (:require [cljs.core.async :refer [>! <! chan]])
-#+cljs  (:require-macros [cljs.core.async.macros :refer [go alt!]])
-  )
+#+cljs  (:require-macros [cljs.core.async.macros :refer [go alt!]]))
 
 (defn initializer
   [n initial-values]
@@ -17,132 +16,143 @@
 
 (defn newgrid-row
   [m initialize i0 j0 i]
-  (let [f (fn [row j]
-            (conj row (initialize (+ i0 i) (+ j0 j))))]
-    (reduce f [] (range (+ 2 m)))))
+  (let [row (atom [])]
+    (doseq [j (range (+ 2 m))]
+      (swap! row conj (initialize (+ i0 i) (+ j0 j))))
+    row))
       
 (defn newgrid
   [m initialize]
   (fn [qi qj]
     (let [i0 (* (dec qi) m)
           j0 (* (dec qj) m)
-          f (fn [grid i]
-              (conj grid (newgrid-row m initialize i0 j0 i)))]
-      (reduce f [] (range (+ 2 m))))))
-
+          grid (atom [])]
+      (doseq [i (range (+ 2 m))]
+        (swap! grid conj @(newgrid-row m initialize i0 j0 i)))
+      grid)))
+        
 (defn phase1-step
-  [q m qi qj channels u k]
+  [q m qi qj channels subgrid-atom k]
   (let [{:keys [north south east west]} channels
+        done (chan)
         out (chan)]
     (go
-      (when (< qi q) (>! south ((u m) k)))
-      (when (< qj q) (>! east ((u k) m)))
-      (go
-        (let [u (if (> qi 1)
-                  (assoc-in u [0 k] (<! north))
-                  u)
-              u (if (> qj 1)
-                  (assoc-in u [k 0] (<! west))
-                  u)]
-          (>! out u))))
+      (when (> qi 1) (swap! subgrid-atom assoc-in [0 k] (<! north)))
+      (>! done :done))
+    (go
+      (when (< qi q) (>! south (get-in @subgrid-atom [m k])))
+      (>! done :done))
+    (go
+      (when (< qj q) (>! east (get-in @subgrid-atom [k m])))
+      (>! done :done))
+    (go
+      (when (> qj 1) (swap! subgrid-atom assoc-in [k 0] (<! west)))
+      (>! done :done))
+    (go
+      (dotimes [_ 4]
+        (<! done))
+      (>! out subgrid-atom))
     out))
 
 (defn exchange-phase1
-  [q m qi qj b channels u]
+  [q m qi qj parity channels subgrid-atom]
   ;; qi row number, qj column number
   ;; qi, qj go from 1 to q inclusive
   (let [out (chan)
-        last (- m b)]
+        last (- m parity)]
     (go
-      (let [new-u (loop [k (- 2 b)
-                         u u]
+      (let [new-subgrid-atom (loop [k (- 2 parity)
+                         subgrid-atom subgrid-atom]
                     (if (> k last)
-                      u
-                      (recur (+ 2 k) (<! (phase1-step q m qi qj channels u k)))))]
-        (>! out new-u)))
+                      subgrid-atom
+                      (recur (+ 2 k) (<! (phase1-step q m qi qj channels subgrid-atom k)))))]
+        (>! out new-subgrid-atom)))
     out))
 
 (defn phase2-step
-  [q m qi qj channels u k]
+  [q m qi qj channels subgrid-atom k]
   (let [{:keys [north south east west]} channels
+        done (chan)
         out (chan)]
     (go
-      (when (> qi 1) (>! north ((u 1) k)))
-      (when (> qj 1) (>! west ((u k) 1)))
-      (go
-        (let [u (if (< qi q)
-                  (assoc-in u [(inc m) k] (<! south))
-                  u)
-              u (if (< qj q)
-                  (assoc-in u [k (inc m)] (<! east))
-                  u)]
-          (>! out u))))
+      (when (> qi 1) (>! north (get-in @subgrid-atom [1 k])))
+      (>! done :done))
+    (go
+      (when (< qi q) (swap! subgrid-atom assoc-in [(inc m) k] (<! south)))
+      (>! done :done))
+    (go
+      (when (< qj q) (swap! subgrid-atom assoc-in [k (inc m)] (<! east)))
+      (>! done :done))
+    (go
+      (when (> qj 1) (>! west (get-in @subgrid-atom [k 1])))
+      (>! done :done))
+    (go
+      (dotimes [_ 4]
+        (<! done))
+      (>! out subgrid-atom))
     out))
 
 (defn exchange-phase2
-  [q m qi qj b channels u]
+  [q m qi qj parity channels subgrid-atom]
   (let [out (chan)
-        last (dec (+ m b))]
+        last (dec (+ m parity))]
     (go
-      (let [new-u (loop [k (inc b)
-                         u u]
+      (let [new-subgrid-atom (loop [k (inc parity)
+                         subgrid-atom subgrid-atom]
                     (if (> k last)
-                      u
-                      (recur (+ 2 k) (<! (phase2-step q m qi qj channels u k)))))]
-        (>! out new-u)))
+                      subgrid-atom
+                      (recur (+ 2 k) (<! (phase2-step q m qi qj channels subgrid-atom k)))))]
+        (>! out new-subgrid-atom)))
     out))
 
 (defn exchange
-  [q m qi qj b channels u]
+  [q m qi qj parity channels subgrid-atom]
   (let [out (chan)]
     (go
-      (let [u (<! (exchange-phase1 q m qi qj b channels u))
-            u (<! (exchange-phase2 q m qi qj b channels u))]
-        (>! out u)))
+      (let [subgrid-atom (<! (exchange-phase1 q m qi qj parity channels subgrid-atom))
+            subgrid-atom (<! (exchange-phase2 q m qi qj parity channels subgrid-atom))]
+        (>! out subgrid-atom)))
     out))
 
 (defn relax-phase
   [transition q m qi qj channels]
-  (fn [u b]
-    (let [assoc-next-state-in (fn [u i j]
-                                (assoc-in u [i j] (transition u i j)))
-          assoc-row-of-next-states-in (fn [u i]
-                                        (let [k (mod (+ i b) 2)
-                                              last (- m k)
-                                              f (fn [u j]
-                                                  (assoc-next-state-in u i j))]
-                                          (reduce f u (range (- 2 k) (inc last) 2))))
-          assoc-next-states-in (fn [u]
-                                 (reduce assoc-row-of-next-states-in u (range 1 (inc m))))]
+  (fn [subgrid-atom parity]
+    (let [assoc-next-states-in (fn [subgrid-atom]
+                                 (doseq [i (range 1 (inc m))]
+                                   (let [k (mod (+ i parity) 2)
+                                         last (- m k)]
+                                     (doseq [j (range (- 2 k) (inc last) 2)]
+                                       (swap! subgrid-atom assoc-in [i j] (transition @subgrid-atom i j)))))
+                                 subgrid-atom)]
       
       (let [out (chan)]
         (go
-          (let [u (<! (exchange q m qi qj (- 1 b) channels u))
-                u (assoc-next-states-in u)]
-            (>! out u)))
+          (let [subgrid-atom (<! (exchange q m qi qj (- 1 parity) channels subgrid-atom))
+                subgrid-atom (assoc-next-states-in subgrid-atom)]
+            (>! out subgrid-atom)))
         out))))
       
 (defn relaxation-step
-  [transition q m qi qj channels u]
+  [transition q m qi qj channels subgrid-atom]
   (let [out (chan)]
     (go
       (let [relaxation-phase (relax-phase transition q m qi qj channels)
-            u (<! (relaxation-phase u 0))
-            u (<! (relaxation-phase u 1))]
-        (>! out u)))
+            subgrid-atom (<! (relaxation-phase subgrid-atom 0))
+            subgrid-atom (<! (relaxation-phase subgrid-atom 1))]
+        (>! out subgrid-atom)))
     out))
 
 (defn relaxation
   [q m transition]
-  (fn [qi qj channels u steps]
+  (fn [qi qj channels subgrid-atom steps]
     (let [out (chan)]
       (go
-        (let [u (loop [step 0
-                       u u]
+        (let [subgrid-atom (loop [step 0
+                       subgrid-atom subgrid-atom]
                   (if (= step steps)
-                    u
-                    (recur (inc step) (<! (relaxation-step transition q m qi qj channels u)))))]
-          (>! out u)))
+                    subgrid-atom
+                    (recur (inc step) (<! (relaxation-step transition q m qi qj channels subgrid-atom)))))]
+          (>! out subgrid-atom)))
       out)))
 
 (defn outputter
@@ -247,23 +257,23 @@ The application object must specify:
     ;; node coordinates range from 1 to q inclusive
     
     (doseq [i (range 1 (inc q))]
-      (let [channels {:north ((ns-channels (dec i)) 1)
-                      :south ((ns-channels i) 1)
-                      :east ((ew-channels i) 1)
-                      :west ((ew-channels (dec i)) q)
-                      :data-in ((output-channels i) 1)
-                      :data-out ((output-channels (dec i)) q)
+      (let [channels {:north (get-in ns-channels [(dec i) 1])
+                      :south (get-in ns-channels [i 1])
+                      :east (get-in ew-channels [i 1])
+                      :west (get-in ew-channels [(dec i) q])
+                      :data-in (get-in output-channels [i 1])
+                      :data-out (get-in output-channels [(dec i) q])
                       }]
         (init-node i 1 channels)))
     
     (doseq [i (range 1 (inc q))
             j (range 2 (inc q))]
-      (let [channels {:north ((ns-channels (dec i)) j)
-                      :south ((ns-channels i) j)
-                      :east ((ew-channels i) j)
-                      :west ((ew-channels i) (dec j))
-                      :data-in ((output-channels i) j)
-                      :data-out ((output-channels i) (dec j))
+      (let [channels {:north (get-in ns-channels [(dec i) j])
+                      :south (get-in ns-channels [i j])
+                      :east (get-in ew-channels [i j])
+                      :west (get-in ew-channels [i (dec j)])
+                      :data-in (get-in output-channels [i j])
+                      :data-out (get-in output-channels [i (dec j)])
                       }]
         (init-node i j channels)))
     

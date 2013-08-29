@@ -23,6 +23,7 @@
     row))
       
 (defn newgrid
+  "Return a function that initializes a subgrid"
   [m init-cell]
   (fn [qi qj]
     (let [i0 (* (dec qi) m)
@@ -182,14 +183,14 @@
 (def RELAXATION-STEPS-PER-OUTPUT 1)
   
 (defn node
-  [init relax output]
+  [init-subgrid relax output]
   (fn [qi qj channels]
   ;; qi row number; qj column number
     (let [{:keys [data-in data-out]} channels
           out (output qi qj data-in data-out)]
       (go
         (loop [step 0
-               u (init qi qj)]
+               u (init-subgrid qi qj)]
           (>! out @u)
           (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels u RELAXATION-STEPS-PER-OUTPUT))))))))
 
@@ -248,10 +249,10 @@ The application object must specify:
         output-channels (chan-matrix)
         n (* q m)
         init-cell (initializer n initial-values)
-        init (newgrid m init-cell)
+        init-subgrid (newgrid m init-cell)
         relax (relaxation q m transition)
         output (outputter q m)
-        init-node (node init relax output)
+        init-node (node init-subgrid relax output)
         start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
         out (master n ((output-channels 0) q) start-time)]
     

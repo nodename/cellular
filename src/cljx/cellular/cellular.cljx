@@ -175,7 +175,7 @@
                 (let [ii (inc i)]
                   (dotimes [j m]
                     (let [jj (inc j)]
-                      (>! out ((subgrid ii) jj))))
+                      (>! out (get-in subgrid [ii jj]))))
                   (<! (copy (* (- q qj) m) in out))))
               (<! (copy (* (- q qi) m m q) in out)))))
       subgrid-in)))

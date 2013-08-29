@@ -189,7 +189,7 @@
       (go
         (loop [step 0
                u (init qi qj)]
-          (>! out u)
+          (>! out @u)
           (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels u RELAXATION-STEPS-PER-OUTPUT))))))))
 
 (defn master

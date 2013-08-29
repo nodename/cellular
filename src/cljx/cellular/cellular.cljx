@@ -187,9 +187,9 @@
           out (output qi qj data-in data-out)]
       (go
         (loop [step 0
-               u (init qi qj)]
-          (>! out @u)
-          (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels u RELAXATION-STEPS-PER-OUTPUT))))))))
+               subgrid-atom (init qi qj)]
+          (>! out @subgrid-atom)
+          (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels subgrid-atom RELAXATION-STEPS-PER-OUTPUT))))))))
 
 (defn master
   "Input the grid of nXn values (states) from the processors, one element at a time.

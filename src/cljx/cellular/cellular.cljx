@@ -157,25 +157,26 @@
 
 (defn outputter
   [q m]
-  (let [copy (fn [count in out]
-               (let [done (chan)]
-                 (go
-                   (dotimes [_ count]
-                     (>! out (<! in)))
-                   (>! done :done))
-                 done))]
-    (fn [qi qj in out]
-      (let [subgrid-in (chan)]
-        (go (while true
-              (let [subgrid (<! subgrid-in)]
-                (dotimes [i m]
-                  (let [ii (inc i)]
-                    (dotimes [j m]
-                      (let [jj (inc j)]
-                        (>! out (get-in subgrid [ii jj])))
-                      (<! (copy (* (- q qj) m) in out))))
-                  (<! (copy (* (- q qi) m m q) in out)))))
-            subgrid-in)))
+  (fn [qi qj in out]
+    (let [subgrid-in (chan)
+          copy (fn [count in out]
+                 (let [done (chan)]
+                   (go
+                     (dotimes [_ count]
+                       (>! out (<! in)))
+                     (>! done :done))
+                   done))]
+      (go
+        (while true
+            (let [subgrid (<! subgrid-in)]
+              (dotimes [i m]
+                (let [ii (inc i)]
+                  (dotimes [j m]
+                    (let [jj (inc j)]
+                      (>! out ((subgrid ii) jj))))
+                  (<! (copy (* (- q qj) m) in out))))
+              (<! (copy (* (- q qi) m m q) in out)))))
+      subgrid-in)))
 
 (def RELAXATION-STEPS-PER-OUTPUT 1)
   
@@ -187,9 +188,9 @@
           out (output qi qj data-in data-out)]
       (go
         (loop [step 0
-               subgrid-atom (init qi qj)]
-          (>! out @subgrid-atom)
-          (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels subgrid-atom RELAXATION-STEPS-PER-OUTPUT))))))))
+               u (init qi qj)]
+          (>! out @u)
+          (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels u RELAXATION-STEPS-PER-OUTPUT))))))))
 
 (defn master
   "Input the grid of nXn values (states) from the processors, one element at a time.

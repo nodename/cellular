@@ -173,10 +173,9 @@
   [q m n]
   (let [start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
         in (chan)
-        out (chan)]
-    (go
-      (while true
-        (let [grid (atom (vec (take n (repeat (vec (take n (repeat nil)))))))]
+        out (chan)
+        grid (atom (vec (take n (repeat (vec (take n (repeat nil)))))))]
+    (go (while true
           (doseq [_ (range (* q q))]
             (let [{:keys [subgrid qi qj]} (<! in)
                   i0 (* (dec qi) m)
@@ -185,7 +184,7 @@
                       j (range m)]
                 (swap! grid assoc-in [(+ i0 i) (+ j0 j)] (get-in subgrid [(inc i) (inc j)])))))
           (let [elapsed-ms #+clj (long (/ (- (System/nanoTime) start-time) 1000000)) #+cljs (- (.getTime (js/Date.)) start-time)]
-            (>! out {:elapsed-ms elapsed-ms :grid @grid})))))
+            (>! out {:elapsed-ms elapsed-ms :grid @grid}))))
     {:master-in in :master-out out}))
 
 

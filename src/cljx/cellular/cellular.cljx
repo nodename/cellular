@@ -170,28 +170,20 @@
         (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj neighbors subgrid-atom RELAXATION-STEPS-PER-OUTPUT)))))))
 
 (defn master
-  [q m n start-time]
-  (let [in (chan)
-        out (chan)
-        trim (fn [subgrid]
-               (->> subgrid
-                 (rest)
-                 (butlast)
-                 (map rest)
-                 (map butlast)
-                 (map vec)
-                 (vec)))]
+  [q m n]
+  (let [start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
+        in (chan)
+        out (chan)]
     (go
       (while true
         (let [grid (atom (vec (take n (repeat (vec (take n (repeat nil)))))))]
           (doseq [_ (range (* q q))]
             (let [{:keys [subgrid qi qj]} (<! in)
-                  subgrid (trim subgrid)
                   i0 (* (dec qi) m)
                   j0 (* (dec qj) m)]
               (doseq [i (range m)
                       j (range m)]
-                (swap! grid assoc-in [(+ i0 i) (+ j0 j)] (get-in subgrid [i j])))))
+                (swap! grid assoc-in [(+ i0 i) (+ j0 j)] (get-in subgrid [(inc i) (inc j)])))))
           (let [elapsed-ms #+clj (long (/ (- (System/nanoTime) start-time) 1000000)) #+cljs (- (.getTime (js/Date.)) start-time)]
             (>! out {:elapsed-ms elapsed-ms :grid @grid})))))
     {:master-in in :master-out out}))
@@ -228,8 +220,7 @@ The application object must specify:
         init-cell (initializer n initial-values)
         init-subgrid (newgrid m init-cell)
         relax (relaxation q m transition)
-        start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
-        {:keys [master-in master-out]} (master q m n start-time)
+        {:keys [master-in master-out]} (master q m n)
         init-node (node init-subgrid relax master-in)]
     
     ;; node coordinates range from 1 to q inclusive

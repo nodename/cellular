@@ -34,8 +34,8 @@
       grid)))
         
 (defn phase1-step
-  [q m qi qj channels subgrid-atom k]
-  (let [{:keys [north south east west]} channels
+  [q m qi qj neighbors subgrid-atom k]
+  (let [{:keys [north south east west]} neighbors
         done (chan)
         out (chan)]
     (go
@@ -57,7 +57,7 @@
     out))
 
 (defn exchange-phase1
-  [q m qi qj parity channels subgrid-atom]
+  [q m qi qj parity neighbors subgrid-atom]
   ;; qi row number, qj column number
   ;; qi, qj go from 1 to q inclusive
   (let [out (chan)
@@ -67,13 +67,13 @@
                          subgrid-atom subgrid-atom]
                     (if (> k last)
                       subgrid-atom
-                      (recur (+ 2 k) (<! (phase1-step q m qi qj channels subgrid-atom k)))))]
+                      (recur (+ 2 k) (<! (phase1-step q m qi qj neighbors subgrid-atom k)))))]
         (>! out new-subgrid-atom)))
     out))
 
 (defn phase2-step
-  [q m qi qj channels subgrid-atom k]
-  (let [{:keys [north south east west]} channels
+  [q m qi qj neighbors subgrid-atom k]
+  (let [{:keys [north south east west]} neighbors
         done (chan)
         out (chan)]
     (go
@@ -95,7 +95,7 @@
     out))
 
 (defn exchange-phase2
-  [q m qi qj parity channels subgrid-atom]
+  [q m qi qj parity neighbors subgrid-atom]
   (let [out (chan)
         last (dec (+ m parity))]
     (go
@@ -103,21 +103,21 @@
                          subgrid-atom subgrid-atom]
                     (if (> k last)
                       subgrid-atom
-                      (recur (+ 2 k) (<! (phase2-step q m qi qj channels subgrid-atom k)))))]
+                      (recur (+ 2 k) (<! (phase2-step q m qi qj neighbors subgrid-atom k)))))]
         (>! out new-subgrid-atom)))
     out))
 
 (defn exchange
-  [q m qi qj parity channels subgrid-atom]
+  [q m qi qj parity neighbors subgrid-atom]
   (let [out (chan)]
     (go
-      (let [subgrid-atom (<! (exchange-phase1 q m qi qj parity channels subgrid-atom))
-            subgrid-atom (<! (exchange-phase2 q m qi qj parity channels subgrid-atom))]
+      (let [subgrid-atom (<! (exchange-phase1 q m qi qj parity neighbors subgrid-atom))
+            subgrid-atom (<! (exchange-phase2 q m qi qj parity neighbors subgrid-atom))]
         (>! out subgrid-atom)))
     out))
 
 (defn relax-phase
-  [transition q m qi qj channels]
+  [transition q m qi qj neighbors]
   (fn [subgrid-atom parity]
     (let [assoc-next-states-in (fn [subgrid-atom]
                                  (doseq [i (range 1 (inc m))]
@@ -129,16 +129,16 @@
       
       (let [out (chan)]
         (go
-          (let [subgrid-atom (<! (exchange q m qi qj (- 1 parity) channels subgrid-atom))
+          (let [subgrid-atom (<! (exchange q m qi qj (- 1 parity) neighbors subgrid-atom))
                 subgrid-atom (assoc-next-states-in subgrid-atom)]
             (>! out subgrid-atom)))
         out))))
       
 (defn relaxation-step
-  [transition q m qi qj channels subgrid-atom]
+  [transition q m qi qj neighbors subgrid-atom]
   (let [out (chan)]
     (go
-      (let [relaxation-phase (relax-phase transition q m qi qj channels)
+      (let [relaxation-phase (relax-phase transition q m qi qj neighbors)
             subgrid-atom (<! (relaxation-phase subgrid-atom 0))
             subgrid-atom (<! (relaxation-phase subgrid-atom 1))]
         (>! out subgrid-atom)))
@@ -146,76 +146,56 @@
 
 (defn relaxation
   [q m transition]
-  (fn [qi qj channels subgrid-atom steps]
+  (fn [qi qj neighbors subgrid-atom steps]
     (let [out (chan)]
       (go
         (let [subgrid-atom (loop [step 0
                        subgrid-atom subgrid-atom]
                   (if (= step steps)
                     subgrid-atom
-                    (recur (inc step) (<! (relaxation-step transition q m qi qj channels subgrid-atom)))))]
+                    (recur (inc step) (<! (relaxation-step transition q m qi qj neighbors subgrid-atom)))))]
           (>! out subgrid-atom)))
       out)))
-
-(defn outputter
-  [q m]
-  (let [copy (fn [count in out]
-               (let [done (chan)]
-                 (go (dotimes [_ count]
-                       (>! out (<! in)))
-                     (>! done :done))
-                 done))]
-    (fn [qi qj in out]
-      (let [subgrid-in (chan)]
-        (go (while true
-              (let [subgrid (<! subgrid-in)]
-                (dotimes [i m]
-                  (let [ii (inc i)]
-                    (dotimes [j m]
-                      (let [jj (inc j)]
-                        (>! out (get-in subgrid [ii jj]))))
-                    (<! (copy (* (- q qj) m) in out))))
-                (<! (copy (* (- q qi) m m q) in out)))))
-        subgrid-in))))
 
 (def RELAXATION-STEPS-PER-OUTPUT 1)
   
 (defn node
-  [init-subgrid relax output]
-  (fn [qi qj channels]
+  [init-subgrid relax out]
+  (fn [qi qj neighbors]
   ;; qi row number; qj column number
-    (let [{:keys [data-in data-out]} channels
-          out (output qi qj data-in data-out)]
-      (go
-        (loop [step 0
-               u (init-subgrid qi qj)]
-          (>! out @u)
-          (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels u RELAXATION-STEPS-PER-OUTPUT))))))))
+    (go
+      (loop [step 0
+             subgrid-atom (init-subgrid qi qj)]
+        (>! out {:subgrid @subgrid-atom :qi qi :qj qj})
+        (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj neighbors subgrid-atom RELAXATION-STEPS-PER-OUTPUT)))))))
 
 (defn master
-  "Input the grid of nXn values (states) from the processors, one element at a time.
-The single input channel comes from the output function of channel h0q (the last channel of
-the north boundary row, i.e. the channel that receives the output from the pipeline threaded
-through the interior elements only."
-  [n in start-time]
-  (let [out (chan)
-        get-row (fn [n in]
-                  (let [out (chan)]
-                    (go
-                      (loop [row []]
-                        (if (= (count row) n)
-                          (>! out row)
-                          (recur (conj row (<! in))))))
-                    out))]
+  [q m n start-time]
+  (let [in (chan)
+        out (chan)
+        trim (fn [subgrid]
+               (->> subgrid
+                 (rest)
+                 (butlast)
+                 (map rest)
+                 (map butlast)
+                 (map vec)
+                 (vec)))]
     (go
       (while true
-        (let [grid (loop [grid []]
-                     (if (= (count grid) n)
-                       grid
-                       (recur (conj grid (<! (get-row n in))))))
-              elapsed-ms #+clj (long (/ (- (System/nanoTime) start-time) 1000000)) #+cljs (- (.getTime (js/Date.)) start-time)]
-          (>! out {:elapsed-ms elapsed-ms :grid grid}))))
-    out))
+        (let [grid (atom (vec (take n (repeat (vec (take n (repeat nil)))))))]
+          (doseq [_ (range (* q q))]
+            (let [{:keys [subgrid qi qj]} (<! in)
+                  subgrid (trim subgrid)
+                  i0 (* (dec qi) m)
+                  j0 (* (dec qj) m)]
+              (doseq [i (range m)
+                      j (range m)]
+                (swap! grid assoc-in [(+ i0 i) (+ j0 j)] (get-in subgrid [i j])))))
+          (let [elapsed-ms #+clj (long (/ (- (System/nanoTime) start-time) 1000000)) #+cljs (- (.getTime (js/Date.)) start-time)]
+            (>! out {:elapsed-ms elapsed-ms :grid @grid})))))
+    {:master-in in :master-out out}))
+
 
 (defn simulate
 "Create a matrix of qXq processor nodes.
@@ -244,37 +224,31 @@ The application object must specify:
         chan-matrix #(vec (repeatedly (inc q) chan-row))
         ew-channels (chan-matrix)
         ns-channels (chan-matrix)
-        output-channels (chan-matrix)
         n (* q m)
         init-cell (initializer n initial-values)
         init-subgrid (newgrid m init-cell)
         relax (relaxation q m transition)
-        output (outputter q m)
-        init-node (node init-subgrid relax output)
         start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
-        out (master n ((output-channels 0) q) start-time)]
+        {:keys [master-in master-out]} (master q m n start-time)
+        init-node (node init-subgrid relax master-in)]
     
     ;; node coordinates range from 1 to q inclusive
     
     (doseq [i (range 1 (inc q))]
-      (let [channels {:north (get-in ns-channels [(dec i) 1])
+      (let [neighbors {:north (get-in ns-channels [(dec i) 1])
                       :south (get-in ns-channels [i 1])
                       :east (get-in ew-channels [i 1])
                       :west (get-in ew-channels [(dec i) q])
-                      :data-in (get-in output-channels [i 1])
-                      :data-out (get-in output-channels [(dec i) q])
                       }]
-        (init-node i 1 channels)))
+        (init-node i 1 neighbors)))
     
     (doseq [i (range 1 (inc q))
             j (range 2 (inc q))]
-      (let [channels {:north (get-in ns-channels [(dec i) j])
+      (let [neighbors {:north (get-in ns-channels [(dec i) j])
                       :south (get-in ns-channels [i j])
                       :east (get-in ew-channels [i j])
                       :west (get-in ew-channels [i (dec j)])
-                      :data-in (get-in output-channels [i j])
-                      :data-out (get-in output-channels [i (dec j)])
                       }]
-        (init-node i j channels)))
+        (init-node i j neighbors)))
     
-    out))
+    master-out))

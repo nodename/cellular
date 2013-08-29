@@ -32,7 +32,7 @@ A dead tree has probability p2 of being replaced by a live tree."
           :else :dead)))))
 
 (defn simulate-forestfire
-  [q m steps]
+  [q m]
   (let [application {:initial-values initial-values
                      :transition transition}]
-    (simulate q m steps application)))
+    (simulate q m application)))

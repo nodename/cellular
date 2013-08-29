@@ -33,7 +33,7 @@ with parity ordering."
           (+ uc (* fopt residual)))))))
 
 (defn simulate-laplace
-  [q m steps]
+  [q m]
   (let [application {:initial-values initial-values
                      :transition (transitioner (* q m))}]
-    (simulate q m steps application)))
+    (simulate q m application)))

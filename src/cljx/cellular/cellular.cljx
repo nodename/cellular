@@ -180,8 +180,7 @@
         (loop [step 0
                u (init qi qj)]
           (>! out u)
-          (when (< step steps)
-            (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels u RELAXATION-STEPS-PER-OUTPUT)))))))))
+          (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj channels u RELAXATION-STEPS-PER-OUTPUT))))))))
 
 (defn master
   "Input the grid of nXn values (states) from the processors, one element at a time.
@@ -216,9 +215,10 @@ Each processor node is responsible for a subgrid of mXm data cells
 within the complete nXn grid, where n = q * m
 (m must be even because we did not bother to code for the odd case.)
 After initializing its subgrid, each node will update the subgrid
-a fixed number of times (specified by the steps parameter)
-before outputting the final values to the out channel.
+and output its successive values.
 The nodes will update their subgrids simultaneously.
+The full grid for each step is assembled by the master process
+and sent to the out channel.
 In numerical analysis, grid iteration is known as relaxation.
 
 The nXn data grid is surrounded by a row of boundary cells on each side.
@@ -228,7 +228,7 @@ The application object must specify:
     and a transition function that returns the next value for a cell
     given the subgrid and the cell's position in the subgrid.
 "
-  [q m steps application]
+  [q m application]
   (let [{:keys [initial-values transition]} application
         chan-row #(vec (repeatedly (inc q) chan)) ;; we only use elements 1 through q of chan-row
         chan-matrix #(vec (repeatedly (inc q) chan-row))
@@ -240,7 +240,7 @@ The application object must specify:
         init (newgrid m initialize)
         relax (relaxation q m transition)
         output (outputter q m)
-        init-node (node init relax steps output)
+        init-node (node init relax output)
         start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
         out (master n ((output-channels 0) q) start-time)]
     

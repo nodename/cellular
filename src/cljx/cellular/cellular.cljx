@@ -4,6 +4,7 @@
 #+cljs  (:require-macros [cljs.core.async.macros :refer [go alt!]]))
 
 (defn initializer
+  "Return a function that initializes a single data cell"
   [n initial-values]
   (let [{:keys [north-boundary south-boundary east-boundary west-boundary interior]} initial-values]
     (fn [i j]
@@ -15,20 +16,20 @@
         :else interior))))
 
 (defn newgrid-row
-  [m initialize i0 j0 i]
+  [m init-cell i0 j0 i]
   (let [row (atom [])]
     (doseq [j (range (+ 2 m))]
-      (swap! row conj (initialize (+ i0 i) (+ j0 j))))
+      (swap! row conj (init-cell (+ i0 i) (+ j0 j))))
     row))
       
 (defn newgrid
-  [m initialize]
+  [m init-cell]
   (fn [qi qj]
     (let [i0 (* (dec qi) m)
           j0 (* (dec qj) m)
           grid (atom [])]
       (doseq [i (range (+ 2 m))]
-        (swap! grid conj @(newgrid-row m initialize i0 j0 i)))
+        (swap! grid conj @(newgrid-row m init-cell i0 j0 i)))
       grid)))
         
 (defn phase1-step
@@ -246,8 +247,8 @@ The application object must specify:
         ns-channels (chan-matrix)
         output-channels (chan-matrix)
         n (* q m)
-        initialize (initializer n initial-values)
-        init (newgrid m initialize)
+        init-cell (initializer n initial-values)
+        init (newgrid m init-cell)
         relax (relaxation q m transition)
         output (outputter q m)
         init-node (node init relax output)

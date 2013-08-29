@@ -157,26 +157,25 @@
 
 (defn outputter
   [q m]
-  (fn [qi qj in out]
-    (let [subgrid-in (chan)
-          copy (fn [count in out]
-                 (let [done (chan)]
-                   (go
-                     (dotimes [_ count]
-                       (>! out (<! in)))
-                     (>! done :done))
-                   done))]
-      (go
-        (while true
-            (let [subgrid (<! subgrid-in)]
-              (dotimes [i m]
-                (let [ii (inc i)]
-                  (dotimes [j m]
-                    (let [jj (inc j)]
-                      (>! out ((subgrid ii) jj))))
-                  (<! (copy (* (- q qj) m) in out))))
-              (<! (copy (* (- q qi) m m q) in out)))))
-      subgrid-in)))
+  (let [copy (fn [count in out]
+               (let [done (chan)]
+                 (go
+                   (dotimes [_ count]
+                     (>! out (<! in)))
+                   (>! done :done))
+                 done))]
+    (fn [qi qj in out]
+      (let [subgrid-in (chan)]
+        (go (while true
+              (let [subgrid (<! subgrid-in)]
+                (dotimes [i m]
+                  (let [ii (inc i)]
+                    (dotimes [j m]
+                      (let [jj (inc j)]
+                        (>! out (get-in subgrid [ii jj])))
+                      (<! (copy (* (- q qj) m) in out))))
+                  (<! (copy (* (- q qi) m m q) in out)))))
+            subgrid-in)))
 
 (def RELAXATION-STEPS-PER-OUTPUT 1)
   

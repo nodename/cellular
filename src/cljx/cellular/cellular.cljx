@@ -36,8 +36,9 @@ The subgrids overlap on all four sides."
       grid)))
         
 (defn phase1-step
-  [q m qi qj neighbors subgrid-atom k]
-  (let [{:keys [north south east west]} neighbors
+  [subgrid-atom k params]
+  (let [{:keys [q m qi qj neighbors]} params
+        {:keys [north south east west]} neighbors
         done (chan)
         out (chan)]
     (go
@@ -59,8 +60,9 @@ The subgrids overlap on all four sides."
     out))
 
 (defn phase2-step
-  [q m qi qj neighbors subgrid-atom k]
-  (let [{:keys [north south east west]} neighbors
+  [subgrid-atom k params]
+  (let [{:keys [q m qi qj neighbors]} params
+        {:keys [north south east west]} neighbors
         done (chan)
         out (chan)]
     (go
@@ -82,65 +84,71 @@ The subgrids overlap on all four sides."
     out))
 
 (defn exchange-phase1
-  [q m qi qj parity neighbors subgrid-atom]
-  ;; qi row number, qj column number
-  ;; qi, qj go from 1 to q inclusive
-  (let [out (chan)
+  [subgrid-atom params]
+  (let [{:keys [m parity]} params
+        out (chan)
+        first (- 2 parity)
         last (- m parity)]
     (go
-      (let [new-subgrid-atom (loop [k (- 2 parity)
+      (let [new-subgrid-atom (loop [k first
                                     subgrid-atom subgrid-atom]
                                (if (> k last)
                                  subgrid-atom
-                                 (recur (+ 2 k) (<! (phase1-step q m qi qj neighbors subgrid-atom k)))))]
+                                 (recur (+ 2 k) (<! (phase1-step subgrid-atom k params)))))]
         (>! out new-subgrid-atom)))
     out))
 
 (defn exchange-phase2
-  [q m qi qj parity neighbors subgrid-atom]
-  (let [out (chan)
+  [subgrid-atom params]
+  (let [{:keys [m parity]} params
+        out (chan)
+        first (inc parity)
         last (dec (+ m parity))]
     (go
-      (let [new-subgrid-atom (loop [k (inc parity)
+      (let [new-subgrid-atom (loop [k first
                                     subgrid-atom subgrid-atom]
                                (if (> k last)
                                  subgrid-atom
-                                 (recur (+ 2 k) (<! (phase2-step q m qi qj neighbors subgrid-atom k)))))]
+                                 (recur (+ 2 k) (<! (phase2-step subgrid-atom k params)))))]
         (>! out new-subgrid-atom)))
     out))
 
 (defn exchange
-  [q m qi qj parity neighbors subgrid-atom]
-  (let [out (chan)]
+  [subgrid-atom params]
+  (let [{:keys [q m qi qj parity neighbors]} params
+        out (chan)]
     (go
-      (let [subgrid-atom (<! (exchange-phase1 q m qi qj parity neighbors subgrid-atom))
-            subgrid-atom (<! (exchange-phase2 q m qi qj parity neighbors subgrid-atom))]
+      (let [subgrid-atom (<! (exchange-phase1 subgrid-atom params))
+            subgrid-atom (<! (exchange-phase2 subgrid-atom params))]
         (>! out subgrid-atom)))
     out))
 
 (defn relax-phase
-  [transition q m qi qj neighbors]
-  (fn [subgrid-atom parity]
-    (let [assoc-next-states-in (fn [subgrid-atom]
-                                 (doseq [i (range 1 (inc m))]
-                                   (let [k (mod (+ i parity) 2)
-                                         last (- m k)]
-                                     (doseq [j (range (- 2 k) (inc last) 2)]
-                                       (swap! subgrid-atom assoc-in [i j] (transition @subgrid-atom i j)))))
-                                 subgrid-atom)]
-      
-      (let [out (chan)]
-        (go
-          (let [subgrid-atom (<! (exchange q m qi qj (- 1 parity) neighbors subgrid-atom))
-                subgrid-atom (assoc-next-states-in subgrid-atom)]
-            (>! out subgrid-atom)))
-        out))))
+  [params]
+  (let [{:keys [transition m]} params]
+    (fn [subgrid-atom parity]
+      (let [assoc-next-states-in (fn [subgrid-atom]
+                                   (doseq [i (range 1 (inc m))]
+                                     (let [k (mod (+ i parity) 2)
+                                           last (- m k)]
+                                       (doseq [j (range (- 2 k) (inc last) 2)]
+                                         (swap! subgrid-atom assoc-in [i j] (transition @subgrid-atom i j)))))
+                                   subgrid-atom)]
+        (let [params (assoc params :parity (- 1 parity))
+              out (chan)]
+          (go
+            (let [subgrid-atom (<! (exchange subgrid-atom params))
+                  subgrid-atom (assoc-next-states-in subgrid-atom)]
+              (>! out subgrid-atom)))
+          out)))))
       
 (defn relaxation-step
-  [transition q m qi qj neighbors subgrid-atom]
-  (let [out (chan)]
+  [params]
+  (let [{:keys [subgrid-atom]} params
+        params (dissoc params :subgrid-atom)
+        out (chan)]
     (go
-      (let [relaxation-phase (relax-phase transition q m qi qj neighbors)
+      (let [relaxation-phase (relax-phase params)
             subgrid-atom (<! (relaxation-phase subgrid-atom 0))
             subgrid-atom (<! (relaxation-phase subgrid-atom 1))]
         (>! out subgrid-atom)))
@@ -148,14 +156,15 @@ The subgrids overlap on all four sides."
 
 (defn relaxation
   [q m transition]
-  (fn [qi qj neighbors subgrid-atom steps]
-    (let [out (chan)]
+  (fn [params]
+    (let [{:keys [subgrid-atom steps]} params
+          out (chan)]
       (go
         (let [subgrid-atom (loop [step 0
                                   subgrid-atom subgrid-atom]
                              (if (= step steps)
                                subgrid-atom
-                               (recur (inc step) (<! (relaxation-step transition q m qi qj neighbors subgrid-atom)))))]
+                               (recur (inc step) (<! (relaxation-step (assoc params :q q :m m :transition transition))))))]
           (>! out subgrid-atom)))
       out)))
 
@@ -168,7 +177,7 @@ The subgrids overlap on all four sides."
       (loop [step 0
              subgrid-atom (init-subgrid qi qj)]
         (>! out {:subgrid @subgrid-atom :qi qi :qj qj})
-        (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax qi qj neighbors subgrid-atom RELAXATION-STEPS-PER-OUTPUT)))))))
+        (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax {:qi qi :qj qj :neighbors neighbors :subgrid-atom subgrid-atom :steps RELAXATION-STEPS-PER-OUTPUT})))))))
 
 (defn master
   [q m n]

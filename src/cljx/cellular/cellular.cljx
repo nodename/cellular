@@ -143,10 +143,8 @@ The subgrids overlap on all four sides."
           out)))))
       
 (defn relaxation-step
-  [params]
-  (let [{:keys [subgrid-atom]} params
-        params (dissoc params :subgrid-atom)
-        out (chan)]
+  [subgrid-atom params]
+  (let [out (chan)]
     (go
       (let [relaxation-phase (relax-phase params)
             subgrid-atom (<! (relaxation-phase subgrid-atom 0))
@@ -156,15 +154,16 @@ The subgrids overlap on all four sides."
 
 (defn relaxation
   [q m transition]
-  (fn [params]
-    (let [{:keys [subgrid-atom steps]} params
+  (fn [subgrid-atom params]
+    (let [{:keys [steps]} params
           out (chan)]
       (go
         (let [subgrid-atom (loop [step 0
                                   subgrid-atom subgrid-atom]
                              (if (= step steps)
                                subgrid-atom
-                               (recur (inc step) (<! (relaxation-step (assoc params :q q :m m :transition transition))))))]
+                               (recur (inc step)
+                                      (<! (relaxation-step subgrid-atom (assoc params :q q :m m :transition transition))))))]
           (>! out subgrid-atom)))
       out)))
 
@@ -177,7 +176,11 @@ The subgrids overlap on all four sides."
       (loop [step 0
              subgrid-atom (init-subgrid qi qj)]
         (>! out {:subgrid @subgrid-atom :qi qi :qj qj})
-        (recur (+ RELAXATION-STEPS-PER-OUTPUT step) (<! (relax {:qi qi :qj qj :neighbors neighbors :subgrid-atom subgrid-atom :steps RELAXATION-STEPS-PER-OUTPUT})))))))
+        (recur (+ RELAXATION-STEPS-PER-OUTPUT step)
+               (<! (relax subgrid-atom {:qi qi
+                                        :qj qj
+                                        :neighbors neighbors
+                                        :steps RELAXATION-STEPS-PER-OUTPUT})))))))
 
 (defn master
   [q m n]

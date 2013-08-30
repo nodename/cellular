@@ -123,10 +123,10 @@ The subgrids overlap on all four sides."
         (>! out subgrid-atom)))
     out))
 
-(defn relax-phase
+(defn relaxation-phase
   [params]
   (let [{:keys [transition m]} params]
-    (fn [subgrid-atom parity]
+    (fn relax-phase [subgrid-atom parity]
       (let [assoc-next-states-in (fn [subgrid-atom]
                                    (doseq [i (range 1 (inc m))]
                                      (let [k (mod (+ i parity) 2)
@@ -146,9 +146,9 @@ The subgrids overlap on all four sides."
   [subgrid-atom params]
   (let [out (chan)]
     (go
-      (let [relaxation-phase (relax-phase params)
-            subgrid-atom (<! (relaxation-phase subgrid-atom 0))
-            subgrid-atom (<! (relaxation-phase subgrid-atom 1))]
+      (let [relax-phase (relaxation-phase params)
+            subgrid-atom (<! (relax-phase subgrid-atom 0))
+            subgrid-atom (<! (relax-phase subgrid-atom 1))]
         (>! out subgrid-atom)))
     out))
 

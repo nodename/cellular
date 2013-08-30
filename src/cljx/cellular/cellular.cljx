@@ -234,15 +234,8 @@ The application object must specify:
     
     ;; node coordinates range from 1 to q inclusive
     
-    (doseq [i (range 1 (inc q))]
-      (let [neighbors {:north (get-in ns-channels [(dec i) 1])
-                       :south (get-in ns-channels [i 1])
-                       :east (get-in ew-channels [i 1])
-                       :west (get-in ew-channels [(dec i) q])}]
-        (init-node i 1 neighbors)))
-    
     (doseq [i (range 1 (inc q))
-            j (range 2 (inc q))]
+            j (range 1 (inc q))]
       (let [neighbors {:north (get-in ns-channels [(dec i) j])
                        :south (get-in ns-channels [i j])
                        :east (get-in ew-channels [i j])

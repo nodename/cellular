@@ -173,11 +173,9 @@ The subgrids overlap on all four sides."
   [init-subgrid relax out]
   (fn init-node [node-i node-j neighbors]
     (go
-      (loop [step 0
-             subgrid-atom (init-subgrid node-i node-j)]
+      (loop [subgrid-atom (init-subgrid node-i node-j)]
         (>! out {:subgrid @subgrid-atom :node-i node-i :node-j node-j})
-        (recur (+ RELAXATION-STEPS-PER-OUTPUT step)
-               (<! (relax subgrid-atom {:node-i node-i
+        (recur (<! (relax subgrid-atom {:node-i node-i
                                         :node-j node-j
                                         :neighbors neighbors
                                         :steps RELAXATION-STEPS-PER-OUTPUT})))))))

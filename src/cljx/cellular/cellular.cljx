@@ -27,9 +27,9 @@
 of size (m + 2) X (m + 2).
 The subgrids overlap on all four sides."
   [m init-cell]
-  (fn init-subgrid [qi qj]
-    (let [i0 (* (dec qi) m)
-          j0 (* (dec qj) m)
+  (fn init-subgrid [node-i node-j]
+    (let [i0 (* (dec node-i) m)
+          j0 (* (dec node-j) m)
           grid (atom [])]
       (doseq [i (range (+ 2 m))]
         (swap! grid conj @(newgrid-row m init-cell i0 j0 i)))
@@ -37,21 +37,21 @@ The subgrids overlap on all four sides."
         
 (defn phase1-step
   [subgrid-atom k params]
-  (let [{:keys [q m qi qj neighbors]} params
+  (let [{:keys [q m node-i node-j neighbors]} params
         {:keys [north south east west]} neighbors
         done (chan)
         out (chan)]
     (go
-      (when (> qi 1) (swap! subgrid-atom assoc-in [0 k] (<! north)))
+      (when (> node-i 1) (swap! subgrid-atom assoc-in [0 k] (<! north)))
       (>! done :done))
     (go
-      (when (< qi q) (>! south (get-in @subgrid-atom [m k])))
+      (when (< node-i q) (>! south (get-in @subgrid-atom [m k])))
       (>! done :done))
     (go
-      (when (< qj q) (>! east (get-in @subgrid-atom [k m])))
+      (when (< node-j q) (>! east (get-in @subgrid-atom [k m])))
       (>! done :done))
     (go
-      (when (> qj 1) (swap! subgrid-atom assoc-in [k 0] (<! west)))
+      (when (> node-j 1) (swap! subgrid-atom assoc-in [k 0] (<! west)))
       (>! done :done))
     (go
       (dotimes [_ 4]
@@ -61,21 +61,21 @@ The subgrids overlap on all four sides."
 
 (defn phase2-step
   [subgrid-atom k params]
-  (let [{:keys [q m qi qj neighbors]} params
+  (let [{:keys [q m node-i node-j neighbors]} params
         {:keys [north south east west]} neighbors
         done (chan)
         out (chan)]
     (go
-      (when (> qi 1) (>! north (get-in @subgrid-atom [1 k])))
+      (when (> node-i 1) (>! north (get-in @subgrid-atom [1 k])))
       (>! done :done))
     (go
-      (when (< qi q) (swap! subgrid-atom assoc-in [(inc m) k] (<! south)))
+      (when (< node-i q) (swap! subgrid-atom assoc-in [(inc m) k] (<! south)))
       (>! done :done))
     (go
-      (when (< qj q) (swap! subgrid-atom assoc-in [k (inc m)] (<! east)))
+      (when (< node-j q) (swap! subgrid-atom assoc-in [k (inc m)] (<! east)))
       (>! done :done))
     (go
-      (when (> qj 1) (>! west (get-in @subgrid-atom [k 1])))
+      (when (> node-j 1) (>! west (get-in @subgrid-atom [k 1])))
       (>! done :done))
     (go
       (dotimes [_ 4]
@@ -115,7 +115,7 @@ The subgrids overlap on all four sides."
 
 (defn exchange
   [subgrid-atom params]
-  (let [{:keys [q m qi qj parity neighbors]} params
+  (let [{:keys [q m node-i node-j parity neighbors]} params
         out (chan)]
     (go
       (let [subgrid-atom (<! (exchange-phase1 subgrid-atom params))
@@ -171,14 +171,14 @@ The subgrids overlap on all four sides."
   
 (defn node
   [init-subgrid relax out]
-  (fn init-node [qi qj neighbors]
+  (fn init-node [node-i node-j neighbors]
     (go
       (loop [step 0
-             subgrid-atom (init-subgrid qi qj)]
-        (>! out {:subgrid @subgrid-atom :qi qi :qj qj})
+             subgrid-atom (init-subgrid node-i node-j)]
+        (>! out {:subgrid @subgrid-atom :node-i node-i :node-j node-j})
         (recur (+ RELAXATION-STEPS-PER-OUTPUT step)
-               (<! (relax subgrid-atom {:qi qi
-                                        :qj qj
+               (<! (relax subgrid-atom {:node-i node-i
+                                        :node-j node-j
                                         :neighbors neighbors
                                         :steps RELAXATION-STEPS-PER-OUTPUT})))))))
 
@@ -190,9 +190,9 @@ The subgrids overlap on all four sides."
         grid (atom (vec (take n (repeat (vec (take n (repeat nil)))))))]
     (go (while true
           (doseq [_ (range (* q q))]
-            (let [{:keys [subgrid qi qj]} (<! in)
-                  i0 (* (dec qi) m)
-                  j0 (* (dec qj) m)]
+            (let [{:keys [subgrid node-i node-j]} (<! in)
+                  i0 (* (dec node-i) m)
+                  j0 (* (dec node-j) m)]
               (doseq [i (range m)
                       j (range m)]
                 (swap! grid assoc-in [(+ i0 i) (+ j0 j)] (get-in subgrid [(inc i) (inc j)])))))

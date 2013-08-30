@@ -83,40 +83,37 @@ The subgrids overlap on all four sides."
       (>! out subgrid-atom))
     out))
 
-(defn exchange-phase1
-  [subgrid-atom params]
-  (let [{:keys [m parity]} params
-        out (chan)
-        first (- 2 parity)
-        last (- m parity)]
+(defn exchange-phase
+  [first last step subgrid-atom params]
+  (let [out (chan)]
     (go
       (let [new-subgrid-atom (loop [k first
                                     subgrid-atom subgrid-atom]
                                (if (> k last)
                                  subgrid-atom
-                                 (recur (+ 2 k) (<! (phase1-step subgrid-atom k params)))))]
+                                 (recur (+ 2 k) (<! (step subgrid-atom k params)))))]
         (>! out new-subgrid-atom)))
     out))
+
+(defn exchange-phase1
+  [subgrid-atom params]
+  (let [{:keys [m parity]} params
+        first (- 2 parity)
+        last (- m parity)
+        step phase1-step]
+    (exchange-phase first last step subgrid-atom params)))
 
 (defn exchange-phase2
   [subgrid-atom params]
   (let [{:keys [m parity]} params
-        out (chan)
         first (inc parity)
-        last (dec (+ m parity))]
-    (go
-      (let [new-subgrid-atom (loop [k first
-                                    subgrid-atom subgrid-atom]
-                               (if (> k last)
-                                 subgrid-atom
-                                 (recur (+ 2 k) (<! (phase2-step subgrid-atom k params)))))]
-        (>! out new-subgrid-atom)))
-    out))
+        last (dec (+ m parity))
+        step phase2-step]
+    (exchange-phase first last step subgrid-atom params)))
 
 (defn exchange
   [subgrid-atom params]
-  (let [{:keys [q m node-i node-j parity neighbors]} params
-        out (chan)]
+  (let [out (chan)]
     (go
       (let [subgrid-atom (<! (exchange-phase1 subgrid-atom params))
             subgrid-atom (<! (exchange-phase2 subgrid-atom params))]

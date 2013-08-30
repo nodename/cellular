@@ -23,7 +23,9 @@
     row))
       
 (defn newgrid
-  "Return a function that initializes a subgrid"
+  "Return a function that initializes a subgrid
+of size (m + 2) X (m + 2).
+The subgrids overlap on all four sides."
   [m init-cell]
   (fn [qi qj]
     (let [i0 (* (dec qi) m)
@@ -56,21 +58,6 @@
       (>! out subgrid-atom))
     out))
 
-(defn exchange-phase1
-  [q m qi qj parity neighbors subgrid-atom]
-  ;; qi row number, qj column number
-  ;; qi, qj go from 1 to q inclusive
-  (let [out (chan)
-        last (- m parity)]
-    (go
-      (let [new-subgrid-atom (loop [k (- 2 parity)
-                         subgrid-atom subgrid-atom]
-                    (if (> k last)
-                      subgrid-atom
-                      (recur (+ 2 k) (<! (phase1-step q m qi qj neighbors subgrid-atom k)))))]
-        (>! out new-subgrid-atom)))
-    out))
-
 (defn phase2-step
   [q m qi qj neighbors subgrid-atom k]
   (let [{:keys [north south east west]} neighbors
@@ -94,16 +81,31 @@
       (>! out subgrid-atom))
     out))
 
+(defn exchange-phase1
+  [q m qi qj parity neighbors subgrid-atom]
+  ;; qi row number, qj column number
+  ;; qi, qj go from 1 to q inclusive
+  (let [out (chan)
+        last (- m parity)]
+    (go
+      (let [new-subgrid-atom (loop [k (- 2 parity)
+                                    subgrid-atom subgrid-atom]
+                               (if (> k last)
+                                 subgrid-atom
+                                 (recur (+ 2 k) (<! (phase1-step q m qi qj neighbors subgrid-atom k)))))]
+        (>! out new-subgrid-atom)))
+    out))
+
 (defn exchange-phase2
   [q m qi qj parity neighbors subgrid-atom]
   (let [out (chan)
         last (dec (+ m parity))]
     (go
       (let [new-subgrid-atom (loop [k (inc parity)
-                         subgrid-atom subgrid-atom]
-                    (if (> k last)
-                      subgrid-atom
-                      (recur (+ 2 k) (<! (phase2-step q m qi qj neighbors subgrid-atom k)))))]
+                                    subgrid-atom subgrid-atom]
+                               (if (> k last)
+                                 subgrid-atom
+                                 (recur (+ 2 k) (<! (phase2-step q m qi qj neighbors subgrid-atom k)))))]
         (>! out new-subgrid-atom)))
     out))
 
@@ -150,10 +152,10 @@
     (let [out (chan)]
       (go
         (let [subgrid-atom (loop [step 0
-                       subgrid-atom subgrid-atom]
-                  (if (= step steps)
-                    subgrid-atom
-                    (recur (inc step) (<! (relaxation-step transition q m qi qj neighbors subgrid-atom)))))]
+                                  subgrid-atom subgrid-atom]
+                             (if (= step steps)
+                               subgrid-atom
+                               (recur (inc step) (<! (relaxation-step transition q m qi qj neighbors subgrid-atom)))))]
           (>! out subgrid-atom)))
       out)))
 
@@ -162,7 +164,6 @@
 (defn node
   [init-subgrid relax out]
   (fn [qi qj neighbors]
-  ;; qi row number; qj column number
     (go
       (loop [step 0
              subgrid-atom (init-subgrid qi qj)]
@@ -186,7 +187,6 @@
           (let [elapsed-ms #+clj (long (/ (- (System/nanoTime) start-time) 1000000)) #+cljs (- (.getTime (js/Date.)) start-time)]
             (>! out {:elapsed-ms elapsed-ms :grid @grid}))))
     {:master-in in :master-out out}))
-
 
 (defn simulate
 "Create a matrix of qXq processor nodes.
@@ -226,19 +226,17 @@ The application object must specify:
     
     (doseq [i (range 1 (inc q))]
       (let [neighbors {:north (get-in ns-channels [(dec i) 1])
-                      :south (get-in ns-channels [i 1])
-                      :east (get-in ew-channels [i 1])
-                      :west (get-in ew-channels [(dec i) q])
-                      }]
+                       :south (get-in ns-channels [i 1])
+                       :east (get-in ew-channels [i 1])
+                       :west (get-in ew-channels [(dec i) q])}]
         (init-node i 1 neighbors)))
     
     (doseq [i (range 1 (inc q))
             j (range 2 (inc q))]
       (let [neighbors {:north (get-in ns-channels [(dec i) j])
-                      :south (get-in ns-channels [i j])
-                      :east (get-in ew-channels [i j])
-                      :west (get-in ew-channels [i (dec j)])
-                      }]
+                       :south (get-in ns-channels [i j])
+                       :east (get-in ew-channels [i j])
+                       :west (get-in ew-channels [i (dec j)])}]
         (init-node i j neighbors)))
     
     master-out))

@@ -7,7 +7,7 @@
   "Return a function that initializes a single data cell"
   [n initial-values]
   (let [{:keys [north-boundary south-boundary east-boundary west-boundary interior]} initial-values]
-    (fn [i j]
+    (fn init-cell [i j]
       (cond
         (zero? i) north-boundary
         (= (inc n) i) south-boundary
@@ -27,7 +27,7 @@
 of size (m + 2) X (m + 2).
 The subgrids overlap on all four sides."
   [m init-cell]
-  (fn [qi qj]
+  (fn init-subgrid [qi qj]
     (let [i0 (* (dec qi) m)
           j0 (* (dec qj) m)
           grid (atom [])]
@@ -154,7 +154,7 @@ The subgrids overlap on all four sides."
 
 (defn relaxation
   [q m transition]
-  (fn [subgrid-atom params]
+  (fn relax [subgrid-atom params]
     (let [{:keys [steps]} params
           out (chan)]
       (go
@@ -171,7 +171,7 @@ The subgrids overlap on all four sides."
   
 (defn node
   [init-subgrid relax out]
-  (fn [qi qj neighbors]
+  (fn init-node [qi qj neighbors]
     (go
       (loop [step 0
              subgrid-atom (init-subgrid qi qj)]

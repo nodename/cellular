@@ -29,7 +29,7 @@
           tile-height (/ (.-height image-data) num-tile-rows)]
       (doseq [j (range num-tile-rows)
               i (range num-tile-cols)]
-        (let [cell ((cells i) j)
+        (let [cell (get-in cells [i j])
               {:keys [r g b]} (color cell)]
           (fill-rect ctx (* i tile-width) (* j tile-height) tile-width tile-height r g b))))))
 

@@ -40,10 +40,7 @@
     (.setAttribute canvas "width" (.-innerWidth js/window))
     (.setAttribute canvas "height" (.-innerHeight js/window))
     (.appendChild (.-body js/document) canvas)
-  ;  (add-watch cells-atom :renderer (fn [_ _ _ cells] (render canvas cells)))
-    
-  canvas
-    ))
+    (add-watch cells-atom :renderer (fn [_ _ _ cells] (render canvas cells)))))
 
 (defn requestAnimationFrame
   "Cross-browser wrapper for requestAnimationFrame"
@@ -58,40 +55,19 @@
    (.-msRequestAnimationFrame js/window)
    (.msRequestAnimationFrame js/window callback)))
 
-;(comment
-;(defn run
-;  "The main 'loop' of the simulation."
-;  [q m steps cells-atom]
-;  (let [simulation (simulate-forestfire q m steps)
-;        tick (fn tick [cells-atom]
-;               (let [grid ((<!! simulation) :grid)]
-;                 (log grid)
-;               (reset! cells-atom grid)
-;               (requestAnimationFrame #(tick cells-atom))))]
-;    nil)))
+(defn run
+  "The main 'loop' of the simulation."
+  [q m cells-atom]
+  (let [simulation (simulate-forestfire q m)
+        tick (fn tick [cells-atom]
+               (go
+                 (let [grid ((<! simulation) :grid)]
+                   (reset! cells-atom grid)
+                   (requestAnimationFrame #(tick cells-atom)))))]
+    (tick cells-atom)))
 
 (defn main
   []
-  (let [canvas (init nil)
-        cells (atom [[:alive :alive :alive] [:alive :alive :alive] [:alive :alive :dead]])
-        simulation (simulate-forestfire 10 4 5)]
-    (comment
-    (go
-      (reset! cells ((<! simulation) :grid))
-      (reset! cells ((<! simulation) :grid))
-      (reset! cells ((<! simulation) :grid))
-      (render canvas @cells)))
-    (go
-      (log ((<! simulation) :elapsed-ms))
-      (log ((<! simulation) :elapsed-ms))
-      (log ((<! simulation) :elapsed-ms))
-      (log ((<! simulation) :elapsed-ms)))))
-  
-
-;(comment
-;(defn main
-;  "Starts everything"
-;  []
-;  (let [cells-atom (atom [])]
-;    (init cells-atom)
-;    (run 3 2 10 cells-atom))))
+  (let [cells-atom (atom [])]
+    (init cells-atom)
+    (run 20 4 cells-atom)))

@@ -30,14 +30,14 @@
     (test-positions first-grid positions :burning :dead)))
 
 (defn get-grids
-  "Return a seq of the grids from a forest-fire simulation,
+  "Return a seq of grids from a forest-fire simulation,
 including the initial grid and the n following grids"
   [n]
-  (let [fire-channel (simulate-forestfire 3 2)]
+  (let [fire-channel (simulate-forestfire 4 4)]
     (for [i (range (inc n))]
       ((<!! fire-channel) :grid))))
 
-(def steps 10)
+(def steps 40)
 
 (def grids (vec (get-grids steps)))
 

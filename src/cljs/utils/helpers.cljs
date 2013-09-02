@@ -1,13 +1,6 @@
 (ns utils.helpers
-  (:require [clojure.core.async :refer [<! chan]]
-            [fipp.edn :refer [pprint]])
+  (:require [cljs.core.async :refer [<! chan]])
   (:require-macros [cljs.core.async.macros :refer [go alt!]]))
-
-(defn pprinter []
-  (let [in (chan)]
-    (go (while true
-          (pprint (<! in))))
-    in))
 
 (defn sink []
   (let [in (chan)]

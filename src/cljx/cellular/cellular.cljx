@@ -184,7 +184,7 @@ The subgrids overlap on all four sides."
         out (chan)
         grid (atom (vec (take n (repeat (vec (take n (repeat nil)))))))]
     (go (while true
-          (doseq [_ (range (* q q))]
+          (dotimes [_ (* q q)]
             (let [{:keys [subgrid node-i node-j]} (<! in)
                   i0 (* (dec node-i) m)
                   j0 (* (dec node-j) m)]

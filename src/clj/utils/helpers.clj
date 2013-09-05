@@ -1,5 +1,5 @@
 (ns utils.helpers
-  (:require [clojure.core.async :refer [<! chan go]]
+  (:require [clojure.core.async :refer [<! >! chan go]]
              [fipp.edn :refer [pprint]]))
 
 (defn pprinter []
@@ -29,3 +29,29 @@
             (.print System/out (str value \newline \newline)) ; This is apparently different from (print value), which doesn't flush everything until the user hits return!
             (println ""))))))
   nil)
+
+(defn bounded-buffer
+  [producer consumer-request consumer bufsize]
+  (go (loop [buf []]
+        (let [alts (condp = (count buf)
+                     ;; buffer full: accept only from consumer-request:
+                     bufsize [consumer-request]
+                     ;; buffer empty: accept only from producer:
+                     0 [producer]
+                     ;; otherwise accept from either:
+                     [consumer-request producer])
+              [value source] (alts! alts)]
+          (condp = source
+            consumer-request (do
+                               (>! consumer (first buf))
+                               (recur (vec (rest buf))))
+            producer (recur (conj buf value))))))
+
+    nil)
+
+(defn buffered-chan
+  [channel bufsize]
+  (let [request (chan)
+        consumer (chan)]
+    (bounded-buffer channel request consumer bufsize)
+    {:request request :response consumer}))

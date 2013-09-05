@@ -3,6 +3,8 @@
       :dependencies [[org.clojure/clojure "1.5.1"]
                      [org.clojure/clojurescript "0.0-1847"]
                      [core.async "0.1.0-SNAPSHOT"]
+                     [net.mikera/imagez "0.0.3"]
+                     [net.mikera/mikera-gui "0.1.0"]
                      [fipp "0.4.0"]]
       :min-lein-version "2.0.0"
       :source-paths ["src/clj" "target/generated/clj"]
@@ -25,5 +27,6 @@
                             :compiler {:output-to "resources/public/build/deps.js"
                                        :output-dir "resources/public/build"
                                      ;  :pretty-print true
-                                    ;   :optimizations :advanced}}]})
+                                     ;  :optimizations :advanced}}]})
+                                     ;  :optimizations :simple}}]})
                                        :optimizations :none}}]})

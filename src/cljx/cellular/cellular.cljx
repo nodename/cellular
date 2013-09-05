@@ -179,18 +179,20 @@ The subgrids overlap on all four sides."
 
 (defn master
   [q m n]
-  (let [start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
+  (let [grid (atom (vec (take n (repeat (vec (take n (repeat nil)))))))
+        merge-subgrid (fn [{:keys [subgrid node-i node-j]}]
+                        (let [i0 (* (dec node-i) m)
+                              j0 (* (dec node-j) m)]
+                          (doseq [i (range m)
+                                  j (range m)]
+                            (swap! grid assoc-in [(+ i0 i) (+ j0 j)] (get-in subgrid [(inc i) (inc j)])))))
+        start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
         in (chan)
-        out (chan)
-        grid (atom (vec (take n (repeat (vec (take n (repeat nil)))))))]
-    (go (while true
+        out (chan)]
+    (go 
+      (while true
           (dotimes [_ (* q q)]
-            (let [{:keys [subgrid node-i node-j]} (<! in)
-                  i0 (* (dec node-i) m)
-                  j0 (* (dec node-j) m)]
-              (doseq [i (range m)
-                      j (range m)]
-                (swap! grid assoc-in [(+ i0 i) (+ j0 j)] (get-in subgrid [(inc i) (inc j)])))))
+            (merge-subgrid (<! in)))
           (let [elapsed-ms #+clj (long (/ (- (System/nanoTime) start-time) 1000000)) #+cljs (- (.getTime (js/Date.)) start-time)]
             (>! out {:elapsed-ms elapsed-ms :grid @grid}))))
     {:master-in in :master-out out}))

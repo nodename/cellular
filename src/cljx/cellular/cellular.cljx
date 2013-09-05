@@ -187,14 +187,15 @@ The subgrids overlap on all four sides."
                                   j (range m)]
                             (swap! grid assoc-in [(+ i0 i) (+ j0 j)] (get-in subgrid [(inc i) (inc j)])))))
         start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
+        get-elapsed-ms #+clj (fn [] (long (/ (- (System/nanoTime) start-time) 1000000)))
+                       #+cljs (fn [] (- (.getTime (js/Date.)) start-time))
         in (chan)
         out (chan)]
     (go 
       (while true
           (dotimes [_ (* q q)]
             (merge-subgrid (<! in)))
-          (let [elapsed-ms #+clj (long (/ (- (System/nanoTime) start-time) 1000000)) #+cljs (- (.getTime (js/Date.)) start-time)]
-            (>! out {:elapsed-ms elapsed-ms :grid @grid}))))
+          (>! out {:elapsed-ms (get-elapsed-ms) :grid @grid})))
     {:master-in in :master-out out}))
 
 (defn simulate

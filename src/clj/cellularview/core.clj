@@ -1,7 +1,8 @@
 (ns cellularview.core
   (:use [mikera.cljutils.error])
-  (:require [clojure.core.async :refer [<! go]]
+  (:require [clojure.core.async :refer [<! go chan timeout]]
             [cellular.forestfire :refer [simulate-forestfire]]
+            [utils.helpers :refer [buffered-chan]]
             [mikera.image.core :as img]
             [mikera.image.colours :as col])
   (:import [java.awt.image BufferedImage]
@@ -9,15 +10,15 @@
            [java.awt.event WindowListener]
            [javax.swing JComponent JLabel JPanel JFrame]))
 
-;; code in this namespace proudly stolen from Mike Anderson:
+;; Java interop code in this namespace proudly stolen from Mike Anderson:
 ;; https://github.com/mikera/singa-viz/blob/develop/src/main/clojure/mikera/singaviz/main.clj
 
 (defn col ^long
   [state]
   (condp = state
-    :alive (col/rgb 0.0 1.0 0.0)
-    :burning (col/rgb 1.0 0.0 0.0)
-    :dead (col/rgb 0.545 0.271 0.075)))
+    :alive 0xff228b22
+    :burning 0xffff4500
+    :dead 0xff5c4033))
 
 (defn cells->image ^BufferedImage
   [cells]
@@ -67,15 +68,22 @@
 
 (def running (atom true))
 
+(defmacro show-simulation-frame
+  [simulation]
+  `(let [grid# ((<! ~simulation) :grid)
+         bi# (cells->image grid#)]
+     (show (frame bi#) :on-close #(reset! running false))))
+
 (defn run
   [q m]
   (reset! running true)
-  (let [simulation (simulate-forestfire q m)]
-    (go
-      (while @running
-        (let [grid ((<! simulation) :grid)
-              bi (cells->image grid)]
-          (show (frame bi) :on-close #(reset! running false))))))
+  (let [{:keys [request response]} (buffered-chan (simulate-forestfire q m) 30)]
+    
+    (go (while @running
+          (<! (timeout 600))
+          (>! request :ready)
+          (show-simulation-frame response))))
+  
   nil)
 
 (defn main

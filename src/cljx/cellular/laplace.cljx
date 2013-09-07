@@ -24,11 +24,11 @@ with parity ordering."
   (let [fopt (- 2 (/ (* 2 Math/PI) n))]
     (fn
       [subgrid i j]
-      (let [uc ((subgrid i) j)
-            un ((subgrid (dec i)) j)
-            us ((subgrid (inc i)) j)
-            ue ((subgrid i) (inc j))
-            uw ((subgrid i) (dec j))]
+      (let [uc (get-in subgrid [i j])
+            un (get-in subgrid [(dec i) j])
+            us (get-in subgrid [(inc i) j])
+            ue (get-in subgrid [i (inc j)])
+            uw (get-in subgrid [i (dec j)])]
         (let [residual (- (/ (+ un us ue uw) 4.0) uc)]
           (+ uc (* fopt residual)))))))
 

@@ -11,9 +11,21 @@
 (defn transitioner
   "In steady state, the temperature of every interior cell
 is the average of the neighboring temperatures. This is the
-discrete form of Laplace's equation. The residual is a measure
-of how close the temperatures are to satisfying this equation.
+discrete form of Laplace's equation.
+The residual is a measure of how close the temperatures are to satisfying this equation.
 The correction of a temperature is proportional to its residual.
+
+The discrete Laplacian operator is equivalent to a convolution with the kernel:
+
+   0  1  0
+   1 -4  1
+   0  1  0,
+
+or, including the diagonals:
+
+   0.5  1  0.5
+    1  -6   1
+   0.5  1  0.5.
 
 For a large square grid relaxed in parity order, the relaxation factor
     fopt = 2 - 2*pi/n

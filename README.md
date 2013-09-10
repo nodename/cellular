@@ -1,4 +1,6 @@
-# cellular
+=======
+cellular
+========
 
 A core.async implementation of Per Brinch Hansen,
 ["Parallel Cellular Automata: A Model Program for Computational Science"](http://surface.syr.edu/eecs_techreports/167) (1992).

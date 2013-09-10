@@ -1,2 +1,8 @@
 resources/public/build
 target/generated
+pom.xml
+*jar
+/lib/
+/classes/
+/targets/
+.lein-deps-sum

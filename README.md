@@ -9,7 +9,6 @@ A core.async implementation of Per Brinch Hansen,
 
 ####Clojure:
 
-See ASCII output by running
 ```
 lein repl
 ```

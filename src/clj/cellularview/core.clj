@@ -1,7 +1,8 @@
 (ns cellularview.core
   (:use [mikera.cljutils.error])
-  (:require [clojure.core.async :refer [<! go chan timeout]]
+  (:require [clojure.core.async :refer [<! go timeout]]
             [cellular.forestfire :refer [simulate-forestfire]]
+            [cellular.laplace :refer [simulate-laplace]]
             [utils.helpers :refer [buffered-chan]]
             [mikera.image.core :as img]
             [mikera.image.colours :as col])
@@ -13,12 +14,28 @@
 ;; Java interop code in this namespace proudly stolen from Mike Anderson:
 ;; https://github.com/mikera/singa-viz/blob/develop/src/main/clojure/mikera/singaviz/main.clj
 
-(defn col ^long
+(defn double-color ^long
+  [value]
+  (cond
+    (<= value 0.0) 0xFF000000
+    (<= value 100.0) (let [v (/ value 100.0)] (col/rgb v v v))
+    :else 0xFFFFFFFF))
+
+(defmulti color class)
+(defmethod color clojure.lang.Keyword
   [state]
   (condp = state
     :alive 0xff228b22
     :burning 0xffff4500
     :dead 0xff5c4033))
+
+(defmethod color Long
+  [value]
+  (double-color value))
+
+(defmethod color Double
+  [^double value]
+  (double-color value))
 
 (defn cells->image ^BufferedImage
   [cells]
@@ -27,7 +44,7 @@
         ^BufferedImage bi (img/new-image w h)]
     (dotimes [y h]
       (dotimes [x w]
-        (.setRGB bi (int x) (int y) (unchecked-int (col (get-in cells [y x]))))))
+        (.setRGB bi (int x) (int y) (unchecked-int (color (get-in cells [y x]))))))
     bi))
 
 (defn component
@@ -47,8 +64,10 @@
        :or {title nil}}]
   (let [com (component com)
         ^JFrame fr (Frames/display com (str title))
-        new-frame? (if (not (identical? fr @last-window)) (do (reset! last-window fr) true) false)]
-    (when (and on-close new-frame?)
+      ;  new-frame? (if (not (identical? fr @last-window)) (do (reset! last-window fr) true) false)
+        ]
+   ; (when (and on-close new-frame?)
+    (when on-close
       (.addWindowListener fr (proxy [WindowListener] []
                                (windowActivated [e])
                                (windowClosing [e]
@@ -72,15 +91,15 @@
   [simulation]
   `(let [grid# ((<! ~simulation) :grid)
          bi# (cells->image grid#)]
-     (show (frame bi#) :on-close #(reset! running false))))
+     (show (frame bi#) :title "Relax" :on-close #(reset! running false))))
 
 (defn run
-  [q m]
+  [simulate q m]
   (reset! running true)
-  (let [{:keys [request response]} (buffered-chan (simulate-forestfire q m) 30)]
+  (let [{:keys [request response]} (buffered-chan (simulate q m) 30)]
     
     (go (while @running
-          (<! (timeout 600))
+          (<! (timeout 750))
           (>! request :ready)
           (show-simulation-frame response))))
   
@@ -88,4 +107,5 @@
 
 (defn main
   []
-  (run 20 6))
+;  (run simulate-forestfire 20 8))
+  (run simulate-laplace 5 32))

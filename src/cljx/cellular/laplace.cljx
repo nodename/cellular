@@ -40,8 +40,16 @@ with parity ordering."
             un (get-in subgrid [(dec i) j])
             us (get-in subgrid [(inc i) j])
             ue (get-in subgrid [i (inc j)])
-            uw (get-in subgrid [i (dec j)])]
+            uw (get-in subgrid [i (dec j)])
+;            use (get-in subgrid [(inc i) (inc j)])
+;            usw (get-in subgrid [(inc i) (dec j)])
+;            unw (get-in subgrid [(dec i) (dec j)])
+;            une (get-in subgrid [(dec i) (inc j)])
+            ]
         (let [residual (- (/ (+ un us ue uw) 4.0) uc)]
+;        For a good time try this instead:
+;        (let [residual (- (/ (+ un us ue uw (/ (+ usw use unw une) 2.0)) 6.0) uc)]
+;        Does it get all weird because the corners are not copied?
           (+ uc (* fopt residual)))))))
 
 (defn simulate-laplace

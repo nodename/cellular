@@ -14,15 +14,21 @@
     :dead {:r 139 :g 69 :b 19}))
 
 (defn fill-rect
-  [ctx x y width height r g b]
-  (set! (.-fillStyle ctx) (str "rgb(" r "," g "," b ")"))
-  (.fillRect ctx x y width height))
+  [context x y width height {:keys [r g b]}]
+  (set! (.-fillStyle context) (str "rgb(" r "," g "," b ")"))
+  (.fillRect context x y width height))
+
+(defn stroke-rect
+  [context x y width height line-width {:keys [r g b]}]
+  (set! (. context -strokeStyle) (str "rgb(" r "," g "," b ")"))
+  (set! (. context -lineWidth) line-width)
+  (.strokeRect context x y width height))
 
 (defn render
   [canvas cells]
-  (let [ctx (.getContext canvas "2d")]
-    (.clearRect ctx 0 0 (.-width canvas) (.-height canvas))
-    (let [image-data (.createImageData ctx 600 600)
+  (let [context (.getContext canvas "2d")]
+    (.clearRect context 0 0 (.-width canvas) (.-height canvas))
+    (let [image-data (.createImageData context 600 600)
           num-tile-rows (count cells)
           num-tile-cols (count cells) ;; we assume cells is square
           tile-width (/ (.-width image-data) num-tile-cols)
@@ -30,8 +36,8 @@
       (doseq [j (range num-tile-rows)
               i (range num-tile-cols)]
         (let [cell (get-in cells [i j])
-              {:keys [r g b]} (color cell)]
-          (fill-rect ctx (* i tile-width) (* j tile-height) tile-width tile-height r g b))))))
+              color (color cell)]
+          (fill-rect context (* i tile-width) (* j tile-height) tile-width tile-height color))))))
 
 (defn init
   "Given an atom, initialize the view"

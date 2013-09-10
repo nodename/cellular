@@ -7,11 +7,11 @@ otherwise, it catches fire with probability p1.
 A burning tree dies.
 A dead tree has probability p2 of being replaced by a live tree."
   [subgrid i j]
-  (let [uc ((subgrid i) j)
-        un ((subgrid (dec i)) j)
-        us ((subgrid (inc i)) j)
-        ue ((subgrid i) (inc j))
-        uw ((subgrid i) (dec j))]
+  (let [uc (get-in subgrid [i j])
+        un (get-in subgrid [(dec i) j])
+        us (get-in subgrid [(inc i) j])
+        ue (get-in subgrid [i (inc j)])
+        uw (get-in subgrid [i (dec j)])]
     (let [p1 0.01
           p2 0.3]
       (condp = uc

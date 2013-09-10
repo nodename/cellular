@@ -1,14 +1,7 @@
 (ns cellular.forestfire
   (:require [cellular.cellular :refer [simulate]]))
 
-(def initial-values
-  {:north-boundary :dead
-   :south-boundary :dead
-   :east-boundary :dead
-   :west-boundary :dead
-   :interior :alive})
-
-(defn transition
+(defn- transition
   "If a live tree is next to a burning tree, it burns;
 otherwise, it catches fire with probability p1.
 A burning tree dies.
@@ -33,6 +26,11 @@ A dead tree has probability p2 of being replaced by a live tree."
 
 (defn simulate-forestfire
   [q m]
-  (let [application {:initial-values initial-values
+  (let [initial-values {:north-boundary :dead
+                        :south-boundary :dead
+                        :east-boundary :dead
+                        :west-boundary :dead
+                        :interior :alive}
+        application {:initial-values initial-values
                      :transition transition}]
     (simulate q m application)))

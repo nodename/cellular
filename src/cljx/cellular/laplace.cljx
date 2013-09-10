@@ -1,14 +1,7 @@
 (ns cellular.laplace
   (:require [cellular.cellular :refer [simulate]]))
 
-(def initial-values
-  {:north-boundary 0
-   :south-boundary 100
-   :east-boundary 100
-   :west-boundary 0
-   :interior 50})
-
-(defn transitioner
+(defn- transitioner
   "In steady state, the temperature of every interior cell
 is the average of the neighboring temperatures. This is the
 discrete form of Laplace's equation.
@@ -54,6 +47,11 @@ with parity ordering."
 
 (defn simulate-laplace
   [q m]
-  (let [application {:initial-values initial-values
+  (let [initial-values {:north-boundary 0
+                        :south-boundary 100
+                        :east-boundary 100
+                        :west-boundary 0
+                        :interior 50}
+        application {:initial-values initial-values
                      :transition (transitioner (* q m))}]
     (simulate q m application)))

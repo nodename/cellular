@@ -15,19 +15,21 @@ lein repl
 ```
 
 ```
-(use 'utils.helpers)
+(use 'cellularview.core)
 ```
-and either
 ```
 (use 'cellular.forestfire)
 ```
-or
 ```
 (use 'cellular.laplace)
 ```
 and then (for example)
 ```
-(print-all<! (simulate-forestfire 3 2 10))
+(run simulate-forestfire 5 32)
+```
+or
+```
+(run simulate-laplace 5 32)
 ```
 
 #### ClojureScript:

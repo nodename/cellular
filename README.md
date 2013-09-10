@@ -32,6 +32,7 @@ and then (for example)
 
 Build:
 ```
+lein cljx
 lein cljsbuild once
 ```
 then open resources/public/cellular.html in your browser.

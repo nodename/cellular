@@ -189,7 +189,7 @@ The subgrids overlap on all four sides."
         start-time #+clj (System/nanoTime) #+cljs (.getTime (js/Date.))
         get-elapsed-ms #+clj (fn [] (long (/ (- (System/nanoTime) start-time) 1000000)))
                        #+cljs (fn [] (- (.getTime (js/Date.)) start-time))
-        in (chan)
+        in (chan (* q q))
         out (chan)]
     (go 
       (while true
